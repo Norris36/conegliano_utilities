@@ -1,71 +1,52 @@
-# Jensbay Utilities
+# jensbay-utilities
 
-Personal utility functions for data science, file operations, and web scraping tasks.
-
-## Features
-
-### Core Utilities (`jensbay_utilities.core`)
-- **Code Analysis**: Extract function information from Python files
-- **File Search**: Advanced file search with pattern matching and filtering
-- **File Operations**: Get creation/modification times, filter by date ranges
-
-### Data Utilities (`jensbay_utilities.data_utils`)
-- **DataFrame Operations**: Humanize column names, standardize naming conventions
-- **File Analysis**: Extract column information from Excel/CSV files
-
-### Web Utilities (`jensbay_utilities.web_utils`)
-- **Web Scraping**: Recursive link discovery and crawling
+## Overview
+`jensbay-utilities` is a Python package that provides a collection of utility functions for various tasks, including data manipulation, web interactions, and data visualization. This package is designed to simplify common programming tasks and enhance productivity.
 
 ## Installation
+To install the package, clone the repository and run the following command:
 
-Install directly from GitHub:
 ```bash
-pip install git+https://github.com/yourusername/jensbay-utilities.git
+pip install .
+```
+
+Alternatively, you can install the required dependencies directly using:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Usage
+After installing the package, you can import the utilities in your Python scripts as follows:
 
 ```python
-# Import the entire package
-import jensbay_utilities as ju
-
-# Analyze a Python file
-functions_df = ju.get_functions_dataframe('my_script.py')
-
-# Search for files
-matching_files = ju.hygin('/path/to/search', 'pattern', extensions=['py', 'txt'])
-
-# Humanize DataFrame columns
-clean_df = ju.humanise_df(my_dataframe)
-
-# Crawl web links
-links = ju.find_all_links('https://example.com', max_links=500)
+from jensbay_utilities import core, data_utils, web_utils, viz_utils
 ```
 
-Or import specific modules:
+### Example
+Here is a brief example of how to use the utilities:
+
 ```python
-from jensbay_utilities import data_utils, web_utils
+# Example of using data_utils
+import pandas as pd
+from jensbay_utilities import data_utils
 
-# Get column information from a file
-columns = data_utils.get_columns('data.xlsx')
+data = pd.read_csv('data.csv')
+cleaned_data = data_utils.clean_data(data)
 
-# Find links on a website
-links = web_utils.find_all_links('https://example.com')
+# Example of using web_utils
+from jensbay_utilities import web_utils
+
+response = web_utils.make_request('https://api.example.com/data')
+
+# Example of using viz_utils
+from jensbay_utilities import viz_utils
+
+viz_utils.plot_data(cleaned_data)
 ```
 
-## Updating
+## Contributing
+Contributions are welcome! Please feel free to submit a pull request or open an issue for any suggestions or improvements.
 
-To get the latest version:
-```bash
-pip install --upgrade --force-reinstall git+https://github.com/yourusername/jensbay-utilities.git
-```
-
-## Requirements
-
-- Python 3.7+
-- pandas
-- requests
-- beautifulsoup4
-- tqdm
-- numpy
-- matplotlib
+## License
+This project is licensed under the MIT License. See the LICENSE file for more details.
