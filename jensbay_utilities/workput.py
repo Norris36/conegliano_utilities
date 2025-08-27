@@ -105,6 +105,75 @@ class WorkoutGenerator:
         
         return [""] * exercise_amount
     
+    def get_random_exercises_with_area_coverage(self, difficulty: float = 4.0, 
+                                              exercise_amount: int = 11, tolerance: float = 0.5) -> List[str]:
+        """
+        Get random exercises ensuring at least 1 per area and targeting overall difficulty.
+        
+        ~~~
+        • Ensures at least one exercise per available muscle group area
+        • Randomly fills remaining slots from all exercises
+        • Targets overall mean difficulty across all selected exercises
+        • Returns mix of exercises covering all areas
+        ~~~
+        
+        Args:
+            difficulty (float): Target overall difficulty level
+            exercise_amount (int): Total number of exercises to select
+            tolerance (float): Allowable deviation from target difficulty
+            
+        Returns type: List[str] of exercise names ensuring area coverage
+        """
+        areas = self.df.area.unique().tolist()
+        
+        if exercise_amount < len(areas):
+            raise ValueError(f"exercise_amount ({exercise_amount}) must be >= number of areas ({len(areas)})")
+        
+        for attempt in range(1000):
+            selected_exercises = []
+            
+            # First, ensure at least 1 exercise per area
+            for area in areas:
+                area_exercises = self.df[self.df.area == area].exercise.tolist()
+                if area_exercises:
+                    selected_exercises.append(random.choice(area_exercises))
+            
+            # Fill remaining slots randomly from all exercises
+            remaining_slots = exercise_amount - len(selected_exercises)
+            if remaining_slots > 0:
+                all_exercises = self.df.exercise.tolist()
+                additional_exercises = random.choices(all_exercises, k=remaining_slots)
+                selected_exercises.extend(additional_exercises)
+            
+            # Ensure all exercises are unique
+            unique_exercises = list(set(selected_exercises))
+            if len(unique_exercises) < exercise_amount:
+                continue
+            
+            # Calculate mean difficulty
+            mean_difficulty = self.df[self.df.exercise.isin(unique_exercises)].diffucility.mean()
+            
+            if abs(mean_difficulty - difficulty) <= tolerance:
+                return unique_exercises[:exercise_amount]
+        
+        if self.debug:
+            print(f"Could not find {exercise_amount} exercises with area coverage "
+                  f"and difficulty {difficulty} ± {tolerance} after 1000 attempts")
+        
+        # Fallback: return at least one per area plus random fills
+        fallback_exercises = []
+        for area in areas:
+            area_exercises = self.df[self.df.area == area].exercise.tolist()
+            if area_exercises:
+                fallback_exercises.append(random.choice(area_exercises))
+        
+        remaining = exercise_amount - len(fallback_exercises)
+        if remaining > 0:
+            all_exercises = self.df.exercise.tolist()
+            fallback_exercises.extend(random.choices(all_exercises, k=remaining))
+        
+        return list(set(fallback_exercises))[:exercise_amount]
+    
     def get_area_allocations(self, total_exercises: int, more_abs: bool = True) -> Dict[str, int]:
         """
         Calculate exercise allocation across different muscle group areas.
@@ -148,13 +217,14 @@ class WorkoutGenerator:
         
         return allocation
     
-    def generate_workout_plan(self, days: List[int], custom_allocations: Optional[Dict[str, int]] = None) -> pd.DataFrame:
+    def generate_workout_plan(self, days: List[int], custom_allocations: Optional[Dict[str, int]] = None, 
+                             use_area_coverage: bool = True) -> pd.DataFrame:
         """
         Generate a comprehensive workout plan for multiple days.
         
         ~~~
         • Creates workout routines for specified difficulty days
-        • Uses area allocations to balance muscle group targeting
+        • Uses area coverage method or traditional area allocations
         • Calculates mean difficulty for each workout day
         • Returns structured dataframe with exercises organized by day
         ~~~
@@ -162,30 +232,48 @@ class WorkoutGenerator:
         Args:
             days (List[int]): List of difficulty levels for each workout day
             custom_allocations (Optional[Dict[str, int]]): Custom exercise allocation per area
+            use_area_coverage (bool): If True, ensures at least 1 exercise per area with random fill
             
         Returns type: pd.DataFrame with workout plan organized by days and areas
         """
         workout_df = pd.DataFrame()
         
         for day_difficulty in days:
-            day_exercises = []
-            
-            if custom_allocations:
-                allocations = custom_allocations
-            else:
+            if use_area_coverage and not custom_allocations:
+                # Use new method that ensures area coverage with random selection
                 total_exercises = sum([3 if area == 'Abs' else 2 for area in self.df.area.unique()])
-                allocations = self.get_area_allocations(total_exercises, more_abs=True)
-            
-            for area, count in allocations.items():
-                exercises = self.get_exercises(area, day_difficulty, count)
-                day_exercises.extend(exercises)
+                day_exercises = self.get_random_exercises_with_area_coverage(
+                    difficulty=day_difficulty, 
+                    exercise_amount=total_exercises
+                )
+                
+                # Create information rows based on actual exercise areas
+                information_rows = ['mean']
+                for exercise in day_exercises:
+                    exercise_area = self.df[self.df.exercise == exercise].area.iloc[0] if len(self.df[self.df.exercise == exercise]) > 0 else 'Unknown'
+                    information_rows.append(exercise_area)
+                    
+            else:
+                # Use traditional area-based allocation method
+                day_exercises = []
+                
+                if custom_allocations:
+                    allocations = custom_allocations
+                else:
+                    total_exercises = sum([3 if area == 'Abs' else 2 for area in self.df.area.unique()])
+                    allocations = self.get_area_allocations(total_exercises, more_abs=True)
+                
+                for area, count in allocations.items():
+                    exercises = self.get_exercises(area, day_difficulty, count)
+                    day_exercises.extend(exercises)
+                
+                information_rows = ['mean'] + [area for area, count in allocations.items() for _ in range(count)]
             
             mean_difficulty = self._calculate_mean_difficulty(day_exercises)
             workout_data = [mean_difficulty] + day_exercises
             
             workout_df[day_difficulty] = workout_data
         
-        information_rows = ['mean'] + [area for area, count in allocations.items() for _ in range(count)]
         workout_df['information'] = information_rows
         
         return workout_df[['information'] + days]
@@ -254,7 +342,7 @@ class WorkoutGenerator:
 
 
 def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5], 
-                                 debug: bool = False) -> pd.DataFrame:
+                                 debug: bool = False, use_area_coverage: bool = True) -> pd.DataFrame:
     """
     Convenience function to create workout plan from dataframe.
     
@@ -268,6 +356,7 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
         df (pd.DataFrame): Exercise dataframe with 'exercise', 'area', 'diffucility' columns
         days (List[int]): List of difficulty levels for workout days
         debug (bool): Enable debug output
+        use_area_coverage (bool): If True, ensures at least 1 exercise per area with random selection
         
     Returns type: pd.DataFrame with complete workout plan organized by days
     
@@ -287,8 +376,12 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
         ...     'diffucility': [3, 4, 2]
         ... })
         >>> 
+        >>> # New method (default): ensures area coverage with random selection
         >>> workout_plan = workput.create_workout_from_dataframe(df, days=[3, 4, 5])
+        >>> 
+        >>> # Old method: uses area-specific allocations
+        >>> workout_plan = workput.create_workout_from_dataframe(df, days=[3, 4, 5], use_area_coverage=False)
         >>> print(workout_plan)
     """
     generator = WorkoutGenerator(df, debug=debug)
-    return generator.generate_workout_plan(days)
+    return generator.generate_workout_plan(days, use_area_coverage=use_area_coverage)
