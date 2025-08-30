@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import pandas as pd
 
 
@@ -117,3 +118,105 @@ def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     df_copy.rename(columns=column_mapping, inplace=True)
     
     return df_copy
+
+def pareto_distribution(value_counts):
+    
+    index = value_counts.index
+    values = value_counts.g_counts
+    
+    # Plotting the cumulative distribution
+    plt.figure(figsize=(10, 6))
+    plt.plot(index, values, label='Cumulative Distribution')
+
+    # Adding percentile markers
+    percentiles = [10, 25, 50, 75] + list(range(80, 101, 5))
+    for percentile in percentiles:
+        x_value = np.percentile(index, percentile)
+        y_value = np.percentile(values, percentile)
+        plt.scatter(x_value, y_value, color='red')  # Mark the percentile
+        
+        # Adjust text to display percentile and x_value, position bottom-right of the marker
+        plt.text(x_value, y_value, f'{percentile}% ({x_value:.2f}, {y_value:.2f})', 
+                fontsize=9, 
+                verticalalignment='top',
+                horizontalalignment='left',
+                rotation=(360 - 25))
+
+    # Enhancing the plot
+    pl1t.xlabel('Index')
+    plt.ylabel('Cumulative Sum Percentage')
+    plt.title('Pareto Distribution')
+    plt.grid(True)
+    plt.legend()
+    
+    return plt
+
+def analog_count(dataframe, column, simple = True, normalize = False, plot = False):
+    """This function returns a dataframe with the counts of the values in a column.
+        IF simple = False, it also returns the cumulative counts and the cumulative percentage.
+        IF normalize = True, it returns the percentage of the counts.
+
+    Args:
+        dataframe (pd.DataFrame): a dataframe containing the column.
+        column (str): the name of the column
+        simple (bool, optional): defining if it is a simple vc or with cumulative sums and percentages. Defaults to True.
+        normalize (bool, optional): with normalised values. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
+    y = dataframe[column].value_counts(normalize = normalize).rename_axis(column).reset_index(name='counts')
+    
+    if simple != True:
+        y['h_counts'] = y['counts'].cumsum()
+        y['g_counts'] = y['h_counts'] / y['counts'].sum()
+    
+    try:    
+        if plot and simple :
+            if simple == True:
+                y['h_counts'] = y['counts'].cumsum()
+                y['g_counts'] = y['h_counts'] / y['counts'].sum()
+            
+            my_plot = pareto_distribution(y)
+            my_plot.show()                
+
+
+    except Exception as e:
+        print(e)
+        return y
+    return y
+
+def calculate_column_overlap(df_a, df_b):
+    """
+    Calculate the percentage overlap between each pair of columns from two DataFrames based on unique values.
+
+    Args:
+    df_a (pd.DataFrame): The first DataFrame.
+    df_b (pd.DataFrame): The second DataFrame.
+
+    Returns:
+    pd.DataFrame: A DataFrame in long format showing the overlap percentage between columns of df_a and df_b.
+    """
+    # Create a DataFrame to store the overlap data
+    data_overlap = pd.DataFrame(index=df_a.columns, columns=df_b.columns)
+
+    # Iterate over each column pair and calculate overlap
+    for col_a in data_overlap.index:
+        for col_b in data_overlap.columns:
+            unique_value_column_a = set(df_a[col_a].unique())
+            unique_value_column_b = set(df_b[col_b].unique())
+
+            # Calculate the intersection and percentage overlap
+            intersection = len(unique_value_column_a.intersection(unique_value_column_b))
+            length = len(df_a)
+            data_overlap.loc[col_a, col_b] = round((intersection / length) * 100, 2)
+
+    # Reshape the data_overlap DataFrame to a long format
+    data_overlap_long = data_overlap.stack().reset_index()
+    data_overlap_long.columns = ['column_a', 'column_b', 'overlap']
+
+    # Sort by overlap and reset the index
+    data_overlap_long.sort_values('overlap', ascending=False, inplace=True)
+    data_overlap_long.reset_index(drop=True, inplace=True)
+
+    return data_overlap_long
