@@ -1,15 +1,61 @@
 """
-Jensbay Utilities - Personal utility functions for data science and development tasks
+Conegliano Utilities - Personal utility functions for data science and development tasks
 """
 
-__version__ = "1.0.0"
+import warnings
+import requests
+import json
+from packaging import version
+
+__version__ = "1.0.7"
+
+def check_for_updates():
+    """
+    Check if a newer version is available on GitHub.
+    
+    1. Gets current version from package
+    2. Fetches latest release info from GitHub API
+    3. Compares versions and shows warning if outdated
+    4. Provides upgrade command if update available
+    
+    Returns type: None (NoneType) - prints update information or warnings
+    """
+    try:
+        # GitHub API endpoint for latest release
+        url = "https://api.github.com/repos/Norris36/conegliano_utilities/releases/latest"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            latest_info = response.json()
+            latest_version = latest_info['tag_name'].lstrip('v')
+            current_version = __version__
+            
+            if version.parse(latest_version) > version.parse(current_version):
+                warnings.warn(
+                    f"\n🔔 UPDATE AVAILABLE 🔔\n"
+                    f"Current version: {current_version}\n"
+                    f"Latest version: {latest_version}\n"
+                    f"Run: pip install --upgrade git+https://github.com/Norris36/conegliano_utilities.git\n",
+                    UserWarning,
+                    stacklevel=2
+                )
+            
+    except Exception:
+        # Silently fail - don't disrupt normal usage if check fails
+        pass
+
+# Check for updates on import (optional - can be disabled)
+try:
+    check_for_updates()
+except Exception:
+    pass
 
 # Import main functions to make them available at package level
 from .core import *
 from .data_utils import *
 from .web_utils import *
 
-# Define what gets imported with "from jensbay_utilities import *"
+# Define what gets imported with "from conegliano_utilities import *"
 __all__ = [
     # Core utilities
     'get_functions_dataframe',
