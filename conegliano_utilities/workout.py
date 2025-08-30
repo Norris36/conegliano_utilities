@@ -1,4 +1,4 @@
-## File: jensbay_utilities/workput.py
+## File: conegliano_utilities/workout.py
 import pandas as pd
 import numpy as np
 import random
@@ -367,7 +367,7 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
         
     Example Usage:
         >>> import pandas as pd
-        >>> from jensbay_utilities import workput
+        >>> from conegliano_utilities import workout
         >>> 
         >>> # Your dataframe should look like:
         >>> df = pd.DataFrame({
@@ -377,10 +377,10 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
         ... })
         >>> 
         >>> # New method (default): ensures area coverage with random selection
-        >>> workout_plan = workput.create_workout_from_dataframe(df, days=[3, 4, 5])
+        >>> workout_plan = workout.create_workout_from_dataframe(df, days=[3, 4, 5])
         >>> 
         >>> # Old method: uses area-specific allocations
-        >>> workout_plan = workput.create_workout_from_dataframe(df, days=[3, 4, 5], use_area_coverage=False)
+        >>> workout_plan = workout.create_workout_from_dataframe(df, days=[3, 4, 5], use_area_coverage=False)
         >>> print(workout_plan)
     """
     generator = WorkoutGenerator(df, debug=debug)

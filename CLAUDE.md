@@ -1,0 +1,1 @@
+- in every commit always increase the version by 0.01

@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 import numpy as np
-from jensbay_utilities.workout import WorkoutGenerator, create_workout_from_dataframe
+from conegliano_utilities.workout import WorkoutGenerator, create_workout_from_dataframe
 
 
 class TestWorkoutGenerator(unittest.TestCase):

@@ -4,16 +4,18 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+    requirements = [
+        line.strip() for line in fh if line.strip() and not line.startswith("#")
+    ]
 
 setup(
-    name="jensbay-utilities",
-    version="1.0.3",
+    name="conegliano-utilities",
+    version="1.0.5",
     author="Jens Bay",
     description="Personal utility functions for data science and development tasks",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/jensbay-utilities",
+    url="https://github.com/yourusername/conegliano-utilities",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",

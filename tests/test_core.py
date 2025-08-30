@@ -6,8 +6,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from jensbay_utilities.core import get_functions_dataframe, hygin, find_files, get_file_creation_time, get_file_modified_time
-import jensbay_utilities.core as core_module
+from conegliano_utilities.core import get_functions_dataframe, hygin, find_files, get_file_creation_time, get_file_modified_time
+import conegliano_utilities.core as core_module
 
 
 class TestCore(unittest.TestCase):
