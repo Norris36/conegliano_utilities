@@ -78,10 +78,12 @@ class TestWorkoutGenerator(unittest.TestCase):
         self.assertTrue(all(filtered.diffucility <= 4.0))
     
     def test_create_workout_from_dataframe(self):
-        workout = create_workout_from_dataframe(self.sample_df, days=[3, 4])
+        workout = create_workout_from_dataframe(self.sample_df, days=[3, 4], use_area_coverage=False)
         self.assertIsInstance(workout, pd.DataFrame)
         self.assertTrue(3 in workout.columns)
         self.assertTrue(4 in workout.columns)
+        # Test that workout has expected structure
+        self.assertGreater(len(workout), 0)
 
 
 if __name__ == '__main__':
