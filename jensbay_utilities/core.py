@@ -19,7 +19,7 @@ def get_functions_dataframe(filename: str = 'jensbay_utilities.py') -> pd.DataFr
     • Handles cases with missing type annotations gracefully
     ~~~
 
-    Returns type: pd.DataFrame with columns "Function", "Description", "Input Types", "Output Type"
+    Returns type: df (pd.DataFrame) - structured data with columns "Function", "Description", "Input Types", "Output Type"
     """
     with open(filename, 'r') as file:
         source_code = file.read()
@@ -91,7 +91,7 @@ def hygin(path: str, query: str, extensions=None) -> list:
     • Displays progress using tqdm progress bar
     ~~~
 
-    Returns type: list of file paths matching query and extension criteria
+    Returns type: matching_files (list) - file paths that match query and extension criteria
     """
     if not os.path.isdir(path):
         raise ValueError(f"{path} is not a directory")
@@ -134,7 +134,7 @@ def find_files(paths: List[str], target_date: str = '2025-02-11', days: int = 14
     • Filters files within specified date range window
     ~~~
     
-    Returns type: pd.DataFrame with filtered files and metadata columns
+    Returns type: filtered_working_dataframe (pd.DataFrame) - filtered files with metadata including path, filename, modification date, and folder name
     """
     working_dataframe = pd.DataFrame(paths, columns=['path'])
     
@@ -187,7 +187,7 @@ def get_file_creation_time(file_path: str) -> str:
     • Handles file not found and OS errors gracefully
     ~~~
 
-    Returns type: str representing creation time or error message
+    Returns type: readable_time (str) - creation time in 'YYYY-MM-DD HH:MM:SS' format or error message
     """
     try:
         creation_time = os.path.getctime(file_path)
@@ -207,7 +207,7 @@ def get_file_modified_time(file_path: str) -> str:
     • Handles file not found and OS errors gracefully
     ~~~
 
-    Returns type: str representing modification time or error message
+    Returns type: readable_time (str) - modification time in 'YYYY-MM-DD HH:MM:SS' format or error message
     """
     try:
         modified_time = os.path.getmtime(file_path)

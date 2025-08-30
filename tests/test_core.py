@@ -31,7 +31,7 @@ class TestCore(unittest.TestCase):
         • Ensures ~~~ followed by returns type description
         ~~~
         
-        Returns type: None - assertion-based test
+        Returns type: None (NoneType) - assertion-based test with no return value
         """
         for func in self.core_functions:
             with self.subTest(function=func.__name__):
@@ -42,12 +42,12 @@ class TestCore(unittest.TestCase):
         Validates a single function's documentation format.
         
         ~~~
-        " Extracts and parses function docstring
-        " Checks for required documentation components
-        " Validates structure matches standard format
+        • Extracts and parses function docstring
+        • Checks for required documentation components
+        • Validates structure matches standard format
         ~~~
         
-        Returns type: None - raises AssertionError if validation fails
+        Returns type: None (NoneType) - raises AssertionError if validation fails
         """
         docstring = inspect.getdoc(func)
         self.assertIsNotNone(docstring, f"Function {func.__name__} has no docstring")
@@ -95,10 +95,19 @@ class TestCore(unittest.TestCase):
         self.assertGreater(len(returns_section), 0,
                          f"Function {func.__name__} missing returns section after second ~~~")
         
-        # Check returns format
+        # Check returns format: should be "Returns type: variable_name (datatype) - description"
         returns_line = returns_section[0]
         self.assertTrue(returns_line.lower().startswith('returns type:'),
                        f"Function {func.__name__} returns line doesn't start with 'Returns type:': '{returns_line}'")
+        
+        # Check that it follows format: variable_name (datatype) - description
+        returns_content = returns_line.split('Returns type:', 1)[1].strip()
+        self.assertIn('(', returns_content, 
+                     f"Function {func.__name__} returns line missing datatype in parentheses: '{returns_line}'")
+        self.assertIn(')', returns_content,
+                     f"Function {func.__name__} returns line missing closing parenthesis: '{returns_line}'")
+        self.assertIn(' - ', returns_content,
+                     f"Function {func.__name__} returns line missing ' - ' separator: '{returns_line}'")
     
     def test_core_function_imports(self):
         """
@@ -110,7 +119,7 @@ class TestCore(unittest.TestCase):
         " Ensures no import errors
         ~~~
         
-        Returns type: None - assertion-based test
+        Returns type: None (NoneType) - assertion-based test with no return value
         """
         expected_functions = [
             'get_functions_dataframe',
@@ -137,7 +146,7 @@ class TestCore(unittest.TestCase):
         " Validates returned DataFrame structure
         ~~~
         
-        Returns type: None - assertion-based test
+        Returns type: None (NoneType) - assertion-based test with no return value
         """
         # Create a temporary test file
         test_file_path = '/tmp/test_functions.py'
@@ -181,7 +190,7 @@ def test_func(x: int, y: str) -> bool:
         " Checks error handling for invalid paths
         ~~~
         
-        Returns type: None - assertion-based test
+        Returns type: None (NoneType) - assertion-based test with no return value
         """
         # Test with current directory
         result = hygin('.', 'test_core.py')

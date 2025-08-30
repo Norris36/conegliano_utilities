@@ -16,7 +16,7 @@ class WorkoutGenerator:
     • Supports customizable difficulty targeting and exercise selection
     ~~~
     
-    Returns type: WorkoutGenerator instance with methods for routine generation
+    Returns type: generator (WorkoutGenerator) - initialized instance with methods for routine generation
     """
     
     def __init__(self, dataframe: pd.DataFrame, debug: bool = False):
@@ -46,7 +46,7 @@ class WorkoutGenerator:
         • Raises descriptive errors for missing columns
         ~~~
         
-        Returns type: None
+        Returns type: None (NoneType) - validates dataframe structure with no return value
         """
         required_columns = ['exercise', 'area', 'diffucility']
         missing_columns = [col for col in required_columns if col not in self.df.columns]
@@ -75,7 +75,7 @@ class WorkoutGenerator:
             exercise_amount (int): Number of exercises to select
             tolerance (float): Allowable deviation from target difficulty
             
-        Returns type: List[str] of exercise names or empty strings if not found
+        Returns type: exercises (List[str]) - exercise names matching criteria or empty strings if not found
         """
         if area not in self.df.area.unique():
             available_areas = list(self.df.area.unique())
@@ -122,7 +122,7 @@ class WorkoutGenerator:
             exercise_amount (int): Total number of exercises to select
             tolerance (float): Allowable deviation from target difficulty
             
-        Returns type: List[str] of exercise names ensuring area coverage
+        Returns type: unique_exercises (List[str]) - exercise names ensuring coverage across all muscle areas
         """
         areas = self.df.area.unique().tolist()
         
@@ -358,7 +358,7 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
         debug (bool): Enable debug output
         use_area_coverage (bool): If True, ensures at least 1 exercise per area with random selection
         
-    Returns type: pd.DataFrame with complete workout plan organized by days
+    Returns type: workout (pd.DataFrame) - complete workout plan organized by days and areas with difficulty targets
     
     Expected DataFrame Structure:
         - 'exercise': Name of the exercise (string)
