@@ -5,12 +5,15 @@ def get_columns(path: str) -> str:
     """
     Extract column names from all sheets in an Excel file or CSV file.
     
+    1. Gets file extension from path
+    2. Reads file into dataframe based on extension  
+    3. Extracts column names into formatted list
+    4. Returns semicolon-separated string with results
+    
     Args:
         path (str): File path to the Excel/CSV file to be analyzed
     
-    Returns:
-        str: A semicolon-separated string containing sheet names and their columns,
-             or an error message if the file couldn't be read
+    Returns type: columns_string (str) - semicolon-separated string containing sheet names and their columns, or error message if file couldn't be read
     """
     try:
         file_extension = path.split('.')[-1].lower()
@@ -41,13 +44,16 @@ def get_columns(path: str) -> str:
 def humanise_df(local_df: pd.DataFrame) -> pd.DataFrame:
     """
     Takes a DataFrame and returns it with humanized column names.
-    Removes underscores and applies title case formatting.
+    
+    1. Creates copy of input DataFrame
+    2. Replaces underscores and hyphens with spaces
+    3. Applies title case to first word, lowercase to others
+    4. Returns DataFrame with formatted column names
     
     Args:
         local_df (pd.DataFrame): Input DataFrame to humanize
         
-    Returns:
-        pd.DataFrame: DataFrame with humanized column names
+    Returns type: df_copy (pd.DataFrame) - DataFrame with humanized column names
     """
     # Create a copy to avoid modifying the original
     df_copy = local_df.copy()
@@ -79,15 +85,16 @@ def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Renames DataFrame columns to a standardized format.
     
-    Rules:
-    - 'Name' or 'name' columns become 'name_'
-    - Other columns: remove double spaces, replace spaces with underscores, lowercase
+    1. Creates copy of input DataFrame
+    2. Creates mapping dictionary for column transformations
+    3. Applies special rule for 'Name'/'name' columns
+    4. Standardizes other columns (remove spaces, underscores, lowercase)
+    5. Returns DataFrame with renamed columns
     
     Args:
-        df (pd.DataFrame): The DataFrame whose columns are to be renamed.
+        df (pd.DataFrame): The DataFrame whose columns are to be renamed
 
-    Returns:
-        pd.DataFrame: The DataFrame with renamed columns.
+    Returns type: df_copy (pd.DataFrame) - DataFrame with standardized column names
     """
     # Create a copy to avoid modifying the original
     df_copy = df.copy()

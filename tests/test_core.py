@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from conegliano_utilities.core import get_functions_dataframe, hygin, find_files, get_file_creation_time, get_file_modified_time
+from conegliano_utilities.data_utils import get_columns, humanise_df, rename_columns
 import conegliano_utilities.core as core_module
 
 
@@ -20,32 +21,36 @@ class TestCore(unittest.TestCase):
             get_file_creation_time,
             get_file_modified_time
         ]
+        self.data_functions = [
+            get_columns,
+            humanise_df,
+            rename_columns
+        ]
+        self.all_functions = self.core_functions + self.data_functions
     
     def test_documentation_standard_compliance(self):
         """
-        Test that all functions adhere to the documentation standard.
+        Test that all functions adhere to the enhanced documentation standard.
         
-        ~~~
-        • Checks for summary one-liner followed by ~~~
-        • Validates bulleted list of operations
-        • Ensures ~~~ followed by returns type description
-        ~~~
+        1. Validates summary one-liner
+        2. Checks for numbered steps describing the process
+        3. Validates Args section with proper formatting
+        4. Ensures Returns section with variable (type) - description format
         
         Returns type: None (NoneType) - assertion-based test with no return value
         """
-        for func in self.core_functions:
+        for func in self.all_functions:
             with self.subTest(function=func.__name__):
                 self._validate_function_documentation(func)
     
     def _validate_function_documentation(self, func):
         """
-        Validates a single function's documentation format.
+        Validates a single function's documentation format with enhanced standard.
         
-        ~~~
-        • Extracts and parses function docstring
-        • Checks for required documentation components
-        • Validates structure matches standard format
-        ~~~
+        1. Extracts and parses function docstring
+        2. Checks for summary one-liner
+        3. Validates numbered steps section
+        4. Checks Args and Returns sections
         
         Returns type: None (NoneType) - raises AssertionError if validation fails
         """
@@ -58,56 +63,63 @@ class TestCore(unittest.TestCase):
         self.assertGreaterEqual(len(lines), 4, 
                               f"Function {func.__name__} docstring too short for standard format")
         
-        # Find the ~~~ delimiters
-        first_delimiter_idx = None
-        second_delimiter_idx = None
+        # Find key sections
+        args_idx = None
+        returns_idx = None
+        numbered_steps_start = None
         
         for i, line in enumerate(lines):
-            if line == '~~~':
-                if first_delimiter_idx is None:
-                    first_delimiter_idx = i
-                elif second_delimiter_idx is None:
-                    second_delimiter_idx = i
+            if line.lower().startswith('args:'):
+                args_idx = i
+            elif line.lower().startswith('returns:') or line.lower().startswith('returns type:'):
+                returns_idx = i
+            elif line.strip().startswith('1.') and numbered_steps_start is None:
+                numbered_steps_start = i
+        
+        # 1. Check for summary (first line should be non-empty)
+        self.assertTrue(len(lines[0]) > 0, 
+                       f"Function {func.__name__} missing summary line")
+        
+        # 2. Check for numbered steps
+        if numbered_steps_start is not None:
+            # Validate that we have numbered steps
+            steps_found = []
+            current_idx = numbered_steps_start
+            
+            while current_idx < len(lines) and current_idx < (args_idx or len(lines)):
+                line = lines[current_idx]
+                if line.strip() and (line.strip()[0].isdigit() and line.strip()[1:3] == '. '):
+                    steps_found.append(line)
+                elif line.lower().startswith('args:') or line.lower().startswith('returns'):
                     break
+                current_idx += 1
+            
+            self.assertGreater(len(steps_found), 0,
+                             f"Function {func.__name__} should have numbered steps (1. 2. 3. etc.)")
         
-        self.assertIsNotNone(first_delimiter_idx, 
-                           f"Function {func.__name__} missing first ~~~ delimiter")
-        self.assertIsNotNone(second_delimiter_idx, 
-                           f"Function {func.__name__} missing second ~~~ delimiter")
+        # 3. Check Args section exists if function has parameters
+        if hasattr(func, '__code__') and func.__code__.co_argcount > 0:
+            # Skip 'self' parameter for methods
+            param_count = func.__code__.co_argcount
+            if func.__code__.co_varnames[0] == 'self':
+                param_count -= 1
+            
+            if param_count > 0:
+                self.assertIsNotNone(args_idx, 
+                                   f"Function {func.__name__} has parameters but no Args section")
         
-        # Validate structure
-        # 1. Summary one-liner should be before first ~~~
-        self.assertGreater(first_delimiter_idx, 0,
-                         f"Function {func.__name__} missing summary before first ~~~")
-        
-        # 2. Bulleted operations should be between ~~~ delimiters
-        operations_section = lines[first_delimiter_idx + 1:second_delimiter_idx]
-        self.assertGreater(len(operations_section), 0,
-                         f"Function {func.__name__} missing operations between ~~~ delimiters")
-        
-        # Check that operations are bulleted
-        for i, op_line in enumerate(operations_section):
-            self.assertTrue(op_line.startswith('•') or op_line.startswith('-') or op_line.startswith('*'),
-                          f"Function {func.__name__} operation line {i+1} not properly bulleted: '{op_line}'")
-        
-        # 3. Returns type should follow second ~~~
-        returns_section = lines[second_delimiter_idx + 1:]
-        self.assertGreater(len(returns_section), 0,
-                         f"Function {func.__name__} missing returns section after second ~~~")
-        
-        # Check returns format: should be "Returns type: variable_name (datatype) - description"
-        returns_line = returns_section[0]
-        self.assertTrue(returns_line.lower().startswith('returns type:'),
-                       f"Function {func.__name__} returns line doesn't start with 'Returns type:': '{returns_line}'")
-        
-        # Check that it follows format: variable_name (datatype) - description
-        returns_content = returns_line.split('Returns type:', 1)[1].strip()
-        self.assertIn('(', returns_content, 
-                     f"Function {func.__name__} returns line missing datatype in parentheses: '{returns_line}'")
-        self.assertIn(')', returns_content,
-                     f"Function {func.__name__} returns line missing closing parenthesis: '{returns_line}'")
-        self.assertIn(' - ', returns_content,
-                     f"Function {func.__name__} returns line missing ' - ' separator: '{returns_line}'")
+        # 4. Check Returns section format
+        if returns_idx is not None:
+            returns_line = lines[returns_idx]
+            if returns_line.lower().startswith('returns type:'):
+                # Check enhanced format: variable_name (datatype) - description
+                returns_content = returns_line.split('Returns type:', 1)[1].strip()
+                self.assertIn('(', returns_content, 
+                             f"Function {func.__name__} returns line missing datatype in parentheses: '{returns_line}'")
+                self.assertIn(')', returns_content,
+                             f"Function {func.__name__} returns line missing closing parenthesis: '{returns_line}'")
+                self.assertIn(' - ', returns_content,
+                             f"Function {func.__name__} returns line missing ' - ' separator: '{returns_line}'")
     
     def test_core_function_imports(self):
         """

@@ -8,16 +8,18 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def get_functions_dataframe(filename: str = 'jensbay_utilities.py') -> pd.DataFrame:
+def get_functions_dataframe(filename: str = 'conegliano_utilities.py') -> pd.DataFrame:
     """
     Extracts function names, docstrings, input and output variable types from a Python file.
 
-    ~~~
-    • Parses Python source code using AST module
-    • Extracts function definitions with type hints and docstrings
-    • Creates structured DataFrame with function metadata
-    • Handles cases with missing type annotations gracefully
-    ~~~
+    1. Reads Python source code from specified file
+    2. Parses source code using AST module  
+    3. Extracts function definitions with type hints and docstrings
+    4. Creates structured DataFrame with function metadata
+    5. Handles cases with missing type annotations gracefully
+
+    Args:
+        filename (str): The path to the Python file
 
     Returns type: df (pd.DataFrame) - structured data with columns "Function", "Description", "Input Types", "Output Type"
     """
@@ -84,12 +86,16 @@ def hygin(path: str, query: str, extensions=None) -> list:
     """
     Searches for files that match the given query within the specified path.
 
-    ~~~
-    • Validates input path exists and is directory
-    • Recursively walks through directory structure
-    • Filters files by query pattern and extensions
-    • Displays progress using tqdm progress bar
-    ~~~
+    1. Validates input path exists and is directory
+    2. Normalizes extensions parameter to list format
+    3. Recursively walks through directory structure
+    4. Filters files by query pattern and extensions
+    5. Displays progress using tqdm progress bar
+
+    Args:
+        path (str): The path to start the search from
+        query (str): The file name or pattern to search for
+        extensions (str or list, optional): File extension(s) to filter by
 
     Returns type: matching_files (list) - file paths that match query and extension criteria
     """
@@ -127,12 +133,16 @@ def find_files(paths: List[str], target_date: str = '2025-02-11', days: int = 14
     """
     Find and filter files based on modification date within a specified date range.
     
-    ~~~
-    • Creates DataFrame from input file paths
-    • Validates target date format and converts to datetime
-    • Extracts file metadata including modification times
-    • Filters files within specified date range window
-    ~~~
+    1. Creates DataFrame from input file paths
+    2. Validates target date format and converts to datetime
+    3. Extracts file metadata including modification times
+    4. Calculates date range window around target date
+    5. Filters files within specified date range window
+    
+    Args:
+        paths (List[str]): A list of file paths to be analyzed
+        target_date (str): The center date for filtering in 'YYYY-MM-DD' format
+        days (int): The total number of days in the date range window (default: 14)
     
     Returns type: filtered_working_dataframe (pd.DataFrame) - filtered files with metadata including path, filename, modification date, and folder name
     """
@@ -181,11 +191,13 @@ def get_file_creation_time(file_path: str) -> str:
     """
     Returns the creation time of the file at the given path.
 
-    ~~~
-    • Gets file creation timestamp using os.getctime
-    • Converts timestamp to human-readable format
-    • Handles file not found and OS errors gracefully
-    ~~~
+    1. Gets file creation timestamp using os.getctime
+    2. Converts timestamp to human-readable format
+    3. Handles file not found and OS errors gracefully
+    4. Returns formatted time string or error message
+
+    Args:
+        file_path (str): The path to the file
 
     Returns type: readable_time (str) - creation time in 'YYYY-MM-DD HH:MM:SS' format or error message
     """
@@ -201,11 +213,13 @@ def get_file_modified_time(file_path: str) -> str:
     """
     Get the modified time of a file.
 
-    ~~~
-    • Gets file modification timestamp using os.getmtime
-    • Converts timestamp to human-readable format
-    • Handles file not found and OS errors gracefully
-    ~~~
+    1. Gets file modification timestamp using os.getmtime
+    2. Converts timestamp to human-readable format  
+    3. Handles file not found and OS errors gracefully
+    4. Returns formatted time string or error message
+
+    Args:
+        file_path (str): The path to the file
 
     Returns type: readable_time (str) - modification time in 'YYYY-MM-DD HH:MM:SS' format or error message
     """
