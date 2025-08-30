@@ -12,11 +12,14 @@ def get_functions_dataframe(filename: str = 'jensbay_utilities.py') -> pd.DataFr
     """
     Extracts function names, docstrings, input and output variable types from a Python file.
 
-    Args:
-        filename (str): The path to the Python file.
+    ~~~
+    • Parses Python source code using AST module
+    • Extracts function definitions with type hints and docstrings
+    • Creates structured DataFrame with function metadata
+    • Handles cases with missing type annotations gracefully
+    ~~~
 
-    Returns:
-        pd.DataFrame: A DataFrame with columns "Function", "Description", "Input Types", "Output Type"
+    Returns type: pd.DataFrame with columns "Function", "Description", "Input Types", "Output Type"
     """
     with open(filename, 'r') as file:
         source_code = file.read()
@@ -81,13 +84,14 @@ def hygin(path: str, query: str, extensions=None) -> list:
     """
     Searches for files that match the given query within the specified path.
 
-    Args:
-        path (str): The path to start the search from.
-        query (str): The file name or pattern to search for.
-        extensions (str or list, optional): File extension(s) to filter by.
+    ~~~
+    • Validates input path exists and is directory
+    • Recursively walks through directory structure
+    • Filters files by query pattern and extensions
+    • Displays progress using tqdm progress bar
+    ~~~
 
-    Returns:
-        list: A list of files that match the query and specified extensions.
+    Returns type: list of file paths matching query and extension criteria
     """
     if not os.path.isdir(path):
         raise ValueError(f"{path} is not a directory")
@@ -123,13 +127,14 @@ def find_files(paths: List[str], target_date: str = '2025-02-11', days: int = 14
     """
     Find and filter files based on modification date within a specified date range.
     
-    Args:
-        paths (List[str]): A list of file paths to be analyzed
-        target_date (str): The center date for filtering in 'YYYY-MM-DD' format
-        days (int): The total number of days in the date range window (default: 14)
+    ~~~
+    • Creates DataFrame from input file paths
+    • Validates target date format and converts to datetime
+    • Extracts file metadata including modification times
+    • Filters files within specified date range window
+    ~~~
     
-    Returns:
-        pd.DataFrame: A DataFrame with filtered files and metadata
+    Returns type: pd.DataFrame with filtered files and metadata columns
     """
     working_dataframe = pd.DataFrame(paths, columns=['path'])
     
@@ -176,11 +181,13 @@ def get_file_creation_time(file_path: str) -> str:
     """
     Returns the creation time of the file at the given path.
 
-    Args:
-        file_path (str): The path to the file.
+    ~~~
+    • Gets file creation timestamp using os.getctime
+    • Converts timestamp to human-readable format
+    • Handles file not found and OS errors gracefully
+    ~~~
 
-    Returns:
-        str: The creation time of the file in a readable format.
+    Returns type: str representing creation time or error message
     """
     try:
         creation_time = os.path.getctime(file_path)
@@ -194,11 +201,13 @@ def get_file_modified_time(file_path: str) -> str:
     """
     Get the modified time of a file.
 
-    Args:
-        file_path (str): The path to the file.
+    ~~~
+    • Gets file modification timestamp using os.getmtime
+    • Converts timestamp to human-readable format
+    • Handles file not found and OS errors gracefully
+    ~~~
 
-    Returns:
-        str: The modified time of the file in a human-readable format.
+    Returns type: str representing modification time or error message
     """
     try:
         modified_time = os.path.getmtime(file_path)

@@ -8,7 +8,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="jensbay-utilities",
-    version="1.0.1",
+    version="1.0.2",
     author="Jens Bay",
     description="Personal utility functions for data science and development tasks",
     long_description=long_description,
