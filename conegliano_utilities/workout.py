@@ -2,6 +2,9 @@
 import pandas as pd
 import numpy as np
 import random
+import os
+from pathlib import Path
+from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Union
 
 
@@ -218,7 +221,7 @@ class WorkoutGenerator:
         return allocation
     
     def generate_workout_plan(self, days: List[int], custom_allocations: Optional[Dict[str, int]] = None, 
-                             use_area_coverage: bool = True) -> pd.DataFrame:
+                             use_area_coverage: bool = True, save_to_repo: bool = True) -> pd.DataFrame:
         """
         Generate a comprehensive workout plan for multiple days.
         
@@ -233,8 +236,9 @@ class WorkoutGenerator:
             days (List[int]): List of difficulty levels for each workout day
             custom_allocations (Optional[Dict[str, int]]): Custom exercise allocation per area
             use_area_coverage (bool): If True, ensures at least 1 exercise per area with random fill
+            save_to_repo (bool): If True, saves workout plan to data directory
             
-        Returns type: pd.DataFrame with workout plan organized by days and areas
+        Returns type: workout_df (pd.DataFrame) - workout plan organized by days and areas
         """
         workout_df = pd.DataFrame()
         
@@ -276,7 +280,63 @@ class WorkoutGenerator:
         
         workout_df['information'] = information_rows
         
+        # Save to repository data folder if requested
+        if save_to_repo:
+            self._save_workout_to_repo(workout_df[['information'] + days], days)
+        
         return workout_df[['information'] + days]
+    
+    def _save_workout_to_repo(self, workout_df: pd.DataFrame, days: List[int]) -> None:
+        """
+        Save workout plan to repository data folder.
+        
+        1. Creates data directory if it doesn't exist
+        2. Generates timestamp-based filename
+        3. Saves workout dataframe as CSV
+        4. Updates latest workout file reference
+        
+        Args:
+            workout_df (pd.DataFrame): Generated workout plan
+            days (List[int]): Difficulty days for filename
+            
+        Returns type: None (NoneType) - saves files to disk
+        """
+        try:
+            # Get the repository root (look for setup.py)
+            current_path = Path(__file__).parent
+            repo_root = current_path
+            
+            # Walk up until we find setup.py or reach filesystem root
+            while repo_root.parent != repo_root:
+                if (repo_root / 'setup.py').exists():
+                    break
+                repo_root = repo_root.parent
+            
+            # Create data directory
+            data_dir = repo_root / 'data' / 'workouts'
+            data_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate filename with timestamp and difficulty levels
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            difficulty_str = '_'.join(map(str, days))
+            filename = f'workout_{difficulty_str}_{timestamp}.csv'
+            
+            # Save workout plan
+            filepath = data_dir / filename
+            workout_df.to_csv(filepath, index=False)
+            
+            # Update latest workout reference
+            latest_file = data_dir / 'latest_workout.csv'
+            workout_df.to_csv(latest_file, index=False)
+            
+            if self.debug:
+                print(f"Workout saved to: {filepath}")
+                print(f"Latest workout updated: {latest_file}")
+                
+        except Exception as e:
+            if self.debug:
+                print(f"Failed to save workout: {str(e)}")
+            # Don't raise - saving should not break workout generation
     
     def _calculate_mean_difficulty(self, exercises: List[str]) -> float:
         """
@@ -341,6 +401,68 @@ class WorkoutGenerator:
         return self.df[(self.df.diffucility >= min_difficulty) & (self.df.diffucility <= max_difficulty)]
 
 
+def load_exercise_data_from_github(branch: str = "main") -> pd.DataFrame:
+    """
+    Load default exercise data from GitHub repository.
+    
+    1. Constructs GitHub raw URL for exercise data
+    2. Downloads CSV data using pandas
+    3. Validates data structure and content
+    4. Returns ready-to-use exercise dataframe
+    
+    Args:
+        branch (str): GitHub branch to load from (default: "main")
+        
+    Returns type: exercises_df (pd.DataFrame) - exercise data with columns exercise, area, diffucility
+    """
+    try:
+        # GitHub raw URL for the default exercise data
+        github_url = f"https://raw.githubusercontent.com/Norris36/conegliano_utilities/{branch}/data/workout_data.csv"
+        
+        # Load data from GitHub
+        df = pd.read_csv(github_url)
+        
+        # Validate required columns
+        required_cols = ['exercise', 'area', 'diffucility']
+        if not all(col in df.columns for col in required_cols):
+            raise ValueError(f"Data missing required columns: {required_cols}")
+        
+        return df
+        
+    except Exception as e:
+        raise ConnectionError(f"Failed to load exercise data from GitHub: {str(e)}")
+
+def load_latest_workout_from_github(branch: str = "main") -> pd.DataFrame:
+    """
+    Load the latest workout plan from GitHub repository.
+    
+    1. Constructs GitHub raw URL for latest workout
+    2. Downloads CSV data using pandas
+    3. Returns latest generated workout plan
+    4. Falls back to sample data if not available
+    
+    Args:
+        branch (str): GitHub branch to load from (default: "main")
+        
+    Returns type: workout_df (pd.DataFrame) - latest workout plan or sample data
+    """
+    try:
+        # GitHub raw URL for the latest workout
+        github_url = f"https://raw.githubusercontent.com/Norris36/conegliano_utilities/{branch}/data/workouts/latest_workout.csv"
+        
+        # Load workout from GitHub
+        df = pd.read_csv(github_url)
+        return df
+        
+    except Exception:
+        # Return sample workout if latest not available
+        return pd.DataFrame({
+            'information': ['mean', 'Upper', 'Upper', 'Legs', 'Legs', 'Abs', 'Abs'],
+            3: [3.0, 'Push-ups', 'Pull-ups', 'Squats', 'Lunges', 'Crunches', 'Plank'],
+            4: [4.0, 'Dips', 'Bench Press', 'Deadlifts', 'Wall Sits', 'Sit-ups', 'Russian Twists'],
+            5: [4.5, 'Handstand Push-ups', 'Muscle-ups', 'Pistol Squats', 'Single Leg Deadlifts', 'Dragon Flags', 'L-Sits']
+        })
+
 def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5], 
                                  debug: bool = False, use_area_coverage: bool = True) -> pd.DataFrame:
     """
@@ -385,3 +507,42 @@ def create_workout_from_dataframe(df: pd.DataFrame, days: List[int] = [3, 4, 5],
     """
     generator = WorkoutGenerator(df, debug=debug)
     return generator.generate_workout_plan(days, use_area_coverage=use_area_coverage)
+
+def create_workout_from_github(days: List[int] = [3, 4, 5], debug: bool = False, 
+                              use_area_coverage: bool = True, branch: str = "main") -> pd.DataFrame:
+    """
+    Create workout plan using exercise data directly from GitHub.
+    
+    1. Loads exercise data from GitHub repository
+    2. Creates WorkoutGenerator with remote data
+    3. Generates workout plan for specified days
+    4. Automatically saves workout to repo if running locally
+    
+    Args:
+        days (List[int]): List of difficulty levels for workout days
+        debug (bool): Enable debug output
+        use_area_coverage (bool): If True, ensures at least 1 exercise per area
+        branch (str): GitHub branch to load data from
+        
+    Returns type: workout (pd.DataFrame) - complete workout plan using GitHub data
+    
+    Example Usage:
+        >>> from conegliano_utilities.workout import create_workout_from_github
+        >>> 
+        >>> # Create workout using data from GitHub
+        >>> workout = create_workout_from_github(days=[3, 4, 5])
+        >>> print(workout)
+    """
+    try:
+        # Load exercise data from GitHub
+        exercise_data = load_exercise_data_from_github(branch=branch)
+        
+        # Create workout using remote data
+        generator = WorkoutGenerator(exercise_data, debug=debug)
+        return generator.generate_workout_plan(days, use_area_coverage=use_area_coverage)
+        
+    except ConnectionError as e:
+        if debug:
+            print(f"Failed to load from GitHub: {e}")
+            print("Please ensure you have internet connectivity and the repository is accessible.")
+        raise

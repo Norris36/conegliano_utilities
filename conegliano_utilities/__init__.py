@@ -7,7 +7,7 @@ import requests
 import json
 from packaging import version
 
-__version__ = "1.0.9"
+__version__ = "1.1.0"
 
 def check_for_updates():
     """
@@ -54,6 +54,7 @@ except Exception:
 from .core import *
 from .data_utils import *
 from .web_utils import *
+from .workout import *
 
 # Define what gets imported with "from conegliano_utilities import *"
 __all__ = [
@@ -71,4 +72,11 @@ __all__ = [
     
     # Web utilities
     'find_all_links',
+    
+    # Workout utilities
+    'WorkoutGenerator',
+    'create_workout_from_dataframe',
+    'create_workout_from_github',
+    'load_exercise_data_from_github',
+    'load_latest_workout_from_github',
 ]
