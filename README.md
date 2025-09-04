@@ -1,48 +1,91 @@
-# jensbay-utilities
+# Conegliano Utilities
 
 ## Overview
-`jensbay-utilities` is a Python package that provides a collection of utility functions for various tasks, including data manipulation, web interactions, and data visualization. This package is designed to simplify common programming tasks and enhance productivity.
+`conegliano-utilities` is a Python package that provides a collection of utility functions for data science and development tasks, including data manipulation, web interactions, visualization, and workout generation. This package is designed to simplify common programming tasks and enhance productivity.
 
 ## Installation
-To install the package, clone the repository and run the following command:
+
+### First Time Installation
+Install directly from GitHub:
 
 ```bash
-pip install .
+pip install git+https://github.com/Norris36/conegliano_utilities.git
 ```
 
-Alternatively, you can install the required dependencies directly using:
+### Development Installation
+For development or local modifications:
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/Norris36/conegliano_utilities.git
+cd conegliano_utilities
+pip install -e .
+```
+
+## Updates
+
+The package includes automatic update checking! When you import it, you'll be notified if a newer version is available.
+
+### Update to Latest Version
+```bash
+pip install --upgrade git+https://github.com/Norris36/conegliano_utilities.git
+```
+
+### Install Specific Version
+```bash
+pip install git+https://github.com/Norris36/conegliano_utilities.git@v1.0.8
 ```
 
 ## Usage
-After installing the package, you can import the utilities in your Python scripts as follows:
+After installing the package, you can import the utilities in your Python scripts:
 
 ```python
-from jensbay_utilities import core, data_utils, web_utils, viz_utils
+import conegliano_utilities
+# or import specific modules
+from conegliano_utilities import core, data_utils, web_utils, viz_utils, workout
 ```
 
-### Example
-Here is a brief example of how to use the utilities:
+### Examples
 
+#### Data Analysis
 ```python
-# Example of using data_utils
 import pandas as pd
-from jensbay_utilities import data_utils
+from conegliano_utilities.data_utils import get_columns, humanise_df
 
-data = pd.read_csv('data.csv')
-cleaned_data = data_utils.clean_data(data)
+# Get column information from Excel/CSV
+columns_info = get_columns('data.xlsx')
+print(columns_info)
 
-# Example of using web_utils
-from jensbay_utilities import web_utils
+# Humanize DataFrame column names
+df = pd.read_csv('data.csv')
+clean_df = humanise_df(df)
+```
 
-response = web_utils.make_request('https://api.example.com/data')
+#### Workout Generation
+```python
+from conegliano_utilities.workout import WorkoutGenerator
+import pandas as pd
 
-# Example of using viz_utils
-from jensbay_utilities import viz_utils
+# Create workout data
+exercises = pd.DataFrame({
+    'exercise': ['Push-ups', 'Squats', 'Crunches'],
+    'area': ['Upper', 'Legs', 'Abs'],
+    'diffucility': [3, 4, 2]
+})
 
-viz_utils.plot_data(cleaned_data)
+# Generate workout plan
+generator = WorkoutGenerator(exercises)
+workout_plan = generator.generate_workout_plan([3, 4, 5])
+```
+
+#### File Operations
+```python
+from conegliano_utilities.core import hygin, find_files
+
+# Search for files
+python_files = hygin('/path/to/search', '*.py', extensions=['py'])
+
+# Find files by date
+recent_files = find_files(python_files, target_date='2024-01-01', days=30)
 ```
 
 ## Contributing

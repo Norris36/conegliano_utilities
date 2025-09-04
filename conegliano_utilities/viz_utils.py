@@ -311,43 +311,6 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
 
     return fig, ax
 
-def hygin(path, query):
-    """
-    Searches for directories that match the given query within the specified path.
-
-    Parameters:
-    query (str): The directory name to search for.
-    path (str): The path to start the search from.
-
-    Returns:
-    list: A list of directories that match the query.
-    """
-    # Get the directories in the top directory
-    top_paths = os.listdir(path)
-    directories = []  # List to store directories that match the query
-
-    # Create a TQDM progress bar
-    with tqdm(total=len(top_paths), desc="Initializing search") as pbar:
-        # Iterate over the top_paths
-        for top_dir in top_paths:
-            # Update the progress bar description with the current directory
-            pbar.set_description(f"Searching in {top_dir}")
-            # Construct the full path to the top-level directory
-            full_top_path = os.path.join(path, top_dir)
-            # Check if it's a directory before walking through it
-            if os.path.isdir(full_top_path):
-                # Walk through the directory
-                for root, dirs, files in os.walk(full_top_path):
-                    # If the directory matches the query, join and append it to the list
-                    for f in files:
-                        if query in files:
-                            directories.append(os.path.join(root, f))
-                            # Since we only iterate once per high-level path, we break here
-            # Update the progress bar by one step
-            pbar.update(1)
-            
-    return directories
-
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
     return str(pathlib.Path().absolute())
@@ -355,7 +318,6 @@ def get_current_path():
 def get_parent_dir(path):
     path = pathlib.Path(path)
     return str(path.parent)
-
 
 def my_log(
     ax: Axes,
@@ -968,7 +930,6 @@ def _rgba_to_hex(rgba) -> str:
         int(round(g * 255)),
         int(round(b * 255)),
     ).lower()
-
 
 def _rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
     """
