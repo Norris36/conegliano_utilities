@@ -245,6 +245,104 @@ class WorkoutGenerator:
 
         return allocation
 
+    def generate_detailed_workout_plan(
+        self,
+        day_configs: List[Dict],
+        save_to_repo: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Generate a detailed workout plan with per-day exercise amount customization.
+
+        ~~~
+        • Accepts detailed configuration for each workout day
+        • Allows custom exercise amounts per area per day
+        • Supports different allocation strategies per day
+        • Returns structured dataframe with exercises organized by day
+        ~~~
+
+        Args:
+            day_configs (List[Dict]): List of day configuration dictionaries, each containing:
+                - 'difficulty' (int): Target difficulty level for the day
+                - 'allocations' (Dict[str, int], optional): Custom exercise allocation per area
+                - 'total_exercises' (int, optional): Total exercises if using auto-allocation
+                - 'use_area_coverage' (bool, optional): Whether to ensure area coverage
+                - 'more_abs' (bool, optional): Give abs extra exercise in auto-allocation
+            save_to_repo (bool): If True, saves workout plan to data directory
+
+        Returns type: workout_df (pd.DataFrame) - detailed workout plan organized by days and areas
+        """
+        workout_df = pd.DataFrame()
+        days = []
+
+        for day_config in day_configs:
+            difficulty = day_config["difficulty"]
+            days.append(difficulty)
+
+            custom_allocations = day_config.get("allocations")
+            total_exercises = day_config.get("total_exercises")
+            use_area_coverage = day_config.get("use_area_coverage", True)
+            more_abs = day_config.get("more_abs", True)
+
+            if use_area_coverage and not custom_allocations:
+                # Use area coverage method with specified total or default
+                if total_exercises is None:
+                    total_exercises = sum(
+                        [3 if area == "Abs" else 2 for area in self.df.area.unique()]
+                    )
+
+                day_exercises = self.get_random_exercises_with_area_coverage(
+                    difficulty=difficulty, exercise_amount=total_exercises
+                )
+
+                # Create information rows based on actual exercise areas
+                information_rows = ["mean"]
+                for exercise in day_exercises:
+                    exercise_area = (
+                        self.df[self.df.exercise == exercise].area.iloc[0]
+                        if len(self.df[self.df.exercise == exercise]) > 0
+                        else "Unknown"
+                    )
+                    information_rows.append(exercise_area)
+
+            else:
+                # Use area-based allocation method
+                day_exercises = []
+
+                if custom_allocations:
+                    allocations = custom_allocations
+                else:
+                    if total_exercises is None:
+                        total_exercises = sum(
+                            [
+                                3 if area == "Abs" else 2
+                                for area in self.df.area.unique()
+                            ]
+                        )
+                    allocations = self.get_area_allocations(
+                        total_exercises, more_abs=more_abs
+                    )
+
+                for area, count in allocations.items():
+                    exercises = self.get_exercises(area, difficulty, count)
+                    day_exercises.extend(exercises)
+
+                information_rows = ["mean"] + [
+                    area for area, count in allocations.items() for _ in range(count)
+                ]
+
+            mean_difficulty = self._calculate_mean_difficulty(day_exercises)
+            workout_data = [mean_difficulty] + day_exercises
+
+            workout_df[difficulty] = workout_data
+
+        workout_df["information"] = information_rows
+
+        # Save to repository data folder if requested
+        if save_to_repo:
+            self._save_workout_to_repo(workout_df[["information"] + days], days)
+
+        return workout_df[["information"] + days]
+
     def generate_workout_plan(
         self,
         days: List[int],
@@ -621,6 +719,137 @@ def create_workout_from_dataframe(
     """
     generator = WorkoutGenerator(df, debug=debug)
     return generator.generate_workout_plan(days, use_area_coverage=use_area_coverage)
+
+
+def create_detailed_workout_from_dataframe(
+    df: pd.DataFrame,
+    day_configs: List[Dict],
+    debug: bool = False,
+) -> pd.DataFrame:
+    """
+    Create a detailed workout plan with custom per-day configurations.
+
+    ~~~
+    • Creates WorkoutGenerator instance from provided dataframe
+    • Accepts detailed day-by-day configuration parameters
+    • Allows precise control over exercise amounts per area per day
+    • Returns formatted workout dataframe ready for use
+    ~~~
+
+    Args:
+        df (pd.DataFrame): Exercise dataframe with 'exercise', 'area', 'diffucility' columns
+        day_configs (List[Dict]): List of day configuration dictionaries
+        debug (bool): Enable debug output
+
+    Returns type: workout (pd.DataFrame) - detailed workout plan with custom configurations
+
+    Example Usage:
+        >>> day_configs = [
+        ...     {'difficulty': 3, 'allocations': {'Upper': 3, 'Legs': 2, 'Abs': 4}},
+        ...     {'difficulty': 4, 'total_exercises': 12, 'more_abs': False},
+        ...     {'difficulty': 5, 'use_area_coverage': False, 'allocations': {'Upper': 4, 'Legs': 3, 'Abs': 2}}
+        ... ]
+        >>> workout = create_detailed_workout_from_dataframe(df, day_configs)
+    """
+    generator = WorkoutGenerator(df, debug=debug)
+    return generator.generate_detailed_workout_plan(day_configs)
+
+
+def create_detailed_workout_from_github(
+    day_configs: List[Dict],
+    debug: bool = False,
+    branch: str = "main",
+) -> pd.DataFrame:
+    """
+    Create detailed workout plan with custom configurations using GitHub data.
+
+    ~~~
+    • Loads exercise data from GitHub repository
+    • Creates WorkoutGenerator with remote data
+    • Generates workout plan with detailed day-by-day customization
+    • Automatically saves workout to repo if running locally
+    ~~~
+
+    Args:
+        day_configs (List[Dict]): List of day configuration dictionaries
+        debug (bool): Enable debug output
+        branch (str): GitHub branch to load data from
+
+    Returns type: workout (pd.DataFrame) - detailed workout plan using GitHub data
+
+    Example Usage:
+        >>> day_configs = [
+        ...     {'difficulty': 3, 'allocations': {'Upper': 2, 'Legs': 3, 'Abs': 3}},
+        ...     {'difficulty': 4, 'total_exercises': 10},
+        ...     {'difficulty': 5, 'allocations': {'Upper': 4, 'Legs': 4, 'Abs': 2}}
+        ... ]
+        >>> workout = create_detailed_workout_from_github(day_configs)
+    """
+    try:
+        # Load exercise data from GitHub
+        exercise_data = load_exercise_data_from_github(branch=branch)
+
+        # Create workout using remote data
+        generator = WorkoutGenerator(exercise_data, debug=debug)
+        return generator.generate_detailed_workout_plan(day_configs)
+
+    except ConnectionError as e:
+        if debug:
+            print(f"Failed to load from GitHub: {e}")
+            print(
+                "Please ensure you have internet connectivity and the repository is accessible."
+            )
+        raise
+
+
+def create_day_config(
+    difficulty: int,
+    allocations: Optional[Dict[str, int]] = None,
+    total_exercises: Optional[int] = None,
+    use_area_coverage: bool = True,
+    more_abs: bool = True,
+) -> Dict:
+    """
+    Helper function to create day configuration dictionaries.
+
+    ~~~
+    • Creates properly formatted day configuration for detailed workout plans
+    • Validates configuration parameters and provides defaults
+    • Simplifies the process of setting up complex workout days
+    ~~~
+
+    Args:
+        difficulty (int): Target difficulty level for the day
+        allocations (Optional[Dict[str, int]]): Custom exercise allocation per area
+        total_exercises (Optional[int]): Total exercises if using auto-allocation
+        use_area_coverage (bool): Whether to ensure area coverage
+        more_abs (bool): Give abs extra exercise in auto-allocation
+
+    Returns type: Dict containing day configuration parameters
+
+    Example Usage:
+        >>> # Custom allocation day
+        >>> day1 = create_day_config(3, allocations={'Upper': 3, 'Legs': 2, 'Abs': 4})
+        >>>
+        >>> # Auto-allocation with total count
+        >>> day2 = create_day_config(4, total_exercises=12, more_abs=False)
+        >>>
+        >>> # Area coverage method
+        >>> day3 = create_day_config(5, use_area_coverage=True)
+    """
+    config = {
+        "difficulty": difficulty,
+        "use_area_coverage": use_area_coverage,
+        "more_abs": more_abs,
+    }
+
+    if allocations is not None:
+        config["allocations"] = allocations
+
+    if total_exercises is not None:
+        config["total_exercises"] = total_exercises
+
+    return config
 
 
 def create_workout_from_github(

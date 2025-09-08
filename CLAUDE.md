@@ -1,1 +1,2 @@
 - in every commit always increase the version by 0.01
+- always ensure to update the test_notebook with caller functions of the appneded code
