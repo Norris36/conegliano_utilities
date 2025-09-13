@@ -112,10 +112,19 @@ def hygin(path: str, query: str, extensions=None) -> list:
 
     with tqdm(total=len(top_paths), desc="Initializing search") as pbar:
         for top_dir in top_paths:
-            pbar.set_description(f"Searching in {top_dir}")
             full_top_path = os.path.join(path, top_dir)
-            
+            pbar.set_description(f"Searching in {top_dir}")
+
             if os.path.isdir(full_top_path):
+                # Count the number of subdirectories to update the total
+                dirs_to_search = []
+                for root, dirs, _ in os.walk(full_top_path):
+                    dirs_to_search.extend(dirs)
+
+                # Update the total iterations in the progress bar
+                pbar.total += len(dirs_to_search)
+
+                # Traverse the directory
                 for root, dirs, files in os.walk(full_top_path):
                     for f in files:
                         if query in f:
@@ -124,7 +133,17 @@ def hygin(path: str, query: str, extensions=None) -> list:
                                     matching_files.append(os.path.join(root, f))
                             else:
                                 matching_files.append(os.path.join(root, f))
+
+                    # Update the progress bar description with remaining folders
+                    remaining_folders = len(dirs_to_search) - len([d for d in dirs_to_search if d in root])
+                    pbar.set_description(f"Searching in {root} | Folders left: {remaining_folders}")
+
+                    # Update the progress bar
+                    pbar.update(1)
+
             pbar.update(1)
+
+            
             
     return matching_files
 
@@ -231,3 +250,100 @@ def get_file_modified_time(file_path: str) -> str:
         return "File not found"
     except OSError as e:
         return f"Error: {str(e)}"
+
+
+def get_folder_sizes(root_folder: str) -> dict:
+    """
+    Calculate the size of all immediate subdirectories within a root folder.
+
+    ~~~
+    • Lists all immediate subdirectories in root folder
+    • Walks through each subdirectory recursively
+    • Calculates total size by summing all file sizes
+    • Handles permission errors and inaccessible files gracefully
+    • Returns dictionary mapping folder paths to sizes in bytes
+    ~~~
+
+    Args:
+        root_folder (str): The root directory path to analyze
+
+    Returns type: folder_sizes (dict) - mapping of folder paths to their total sizes in bytes
+    """
+    folder_sizes = {}
+
+    # Get only immediate subdirectories (not files)
+    for item in os.listdir(root_folder):
+        item_path = os.path.join(root_folder, item)
+        if os.path.isdir(item_path):
+            dir_size = 0
+            for dirpath, dirnames, filenames in os.walk(item_path):
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    try:
+                        dir_size += os.path.getsize(filepath)
+                    except (OSError, PermissionError):
+                        continue  # Skip inaccessible files
+            folder_sizes[item_path] = dir_size
+
+    return folder_sizes
+
+
+def create_dataframe_from_folder_sizes(folder_sizes: dict) -> pd.DataFrame:
+    """
+    Create a structured DataFrame from folder size data with analytics.
+
+    ~~~
+    • Creates DataFrame with folder paths and sizes in GB
+    • Sorts folders by size in descending order
+    • Calculates cumulative size totals
+    • Computes percentage and cumulative percentage of total
+    • Adds basename column for folder names
+    • Rounds all numeric values to 2 decimal places
+    ~~~
+
+    Args:
+        folder_sizes (dict): Dictionary mapping folder paths to sizes in bytes
+
+    Returns type: df (pd.DataFrame) - structured data with columns for path, size, cumulative metrics, and percentages
+    """
+    df = pd.DataFrame({
+        "path": list(folder_sizes.keys()),
+        "size (GB)": [size / (1024 ** 3) for size in folder_sizes.values()]
+    })
+    df["size (GB)"] = df["size (GB)"].round(2)  # Round to 2 decimal places
+    df.sort_values(by="size (GB)", ascending=False, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    # now lets get the cummulative size
+    df["cum (size)"] = df["size (GB)"].cumsum().round(2)
+    # and the percentage of total size
+    df['percentage(size)'] = (df["size (GB)"] / df["size (GB)"].sum() * 100).round(2)
+    # and the cumulative percentage of total size
+    df['cum percentage (size)'] = (df['cum (size)'] / df["size (GB)"].sum() * 100).round(2)
+    df["basename"] = df["path"].apply(os.path.basename)
+    return df
+
+
+def get_filesize_dataframe(folder_path: str) -> pd.DataFrame:
+    """
+    Analyze folder sizes and return comprehensive analytics DataFrame.
+
+    ~~~
+    • Validates input path is a valid directory
+    • Calculates sizes of all immediate subdirectories
+    • Creates structured DataFrame with size analytics
+    • Sorts results by size in descending order
+    • Returns complete folder size analysis
+    ~~~
+
+    Args:
+        folder_path (str): The directory path to analyze
+
+    Returns type: df (pd.DataFrame) - complete folder size analysis with metrics and rankings
+    """
+    folder_path = folder_path.strip()
+    if not os.path.isdir(folder_path):
+        raise ValueError("The provided path is not a valid directory.")
+    folder_sizes = get_folder_sizes(folder_path)
+    df = create_dataframe_from_folder_sizes(folder_sizes)
+    df.sort_values(by="size (GB)", ascending=False, inplace=True)
+    return df

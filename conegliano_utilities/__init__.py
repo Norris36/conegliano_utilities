@@ -7,7 +7,7 @@ import requests
 import json
 from packaging import version
 
-__version__ = "1.1.1"
+__version__ = "1.1.11"
 
 def check_for_updates():
     """
@@ -64,6 +64,9 @@ __all__ = [
     'find_files',
     'get_file_creation_time',
     'get_file_modified_time',
+    'get_folder_sizes',
+    'create_dataframe_from_folder_sizes',
+    'get_filesize_dataframe',
     
     # Data utilities
     'get_columns',
