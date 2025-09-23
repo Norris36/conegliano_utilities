@@ -237,6 +237,69 @@ def set_fontsizes(fig, ax, font_size_body=12, font_size_header=None):
 
     return fig, ax
 
+import urllib.request
+from pathlib import Path
+import tempfile
+from urllib.error import URLError
+
+def get_github_otf_path() -> Path:
+    """
+    Downloads a .otf font from a raw GitHub URL to a local temporary file
+    and returns its path.
+
+    This function is designed to be efficient by checking if the file already
+    exists in the temporary directory. If it does, it skips the download.
+
+    Returns
+    -------
+    pathlib.Path
+        The local file path to the downloaded .otf font.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the font file cannot be downloaded from the URL.
+    """
+    # The specific raw GitHub URL for the font file.
+    FONT_URL = "https://github.com/Norris36/conegliano_utilities/raw/864e308854b8b706bad7340abafeca04a89c4c1f/data/GNElliot-Regular.otf"
+    
+    # Define a path for the font in the system's temporary directory.
+    # This avoids cluttering the user's project directory.
+    font_filename = Path(FONT_URL).name
+    font_path = Path(tempfile.gettempdir()) / font_filename
+
+    # --- Caching Logic ---
+    # If the font file already exists, return the path immediately.
+    if font_path.exists():
+        # This print statement is optional but helpful for debugging.
+        # print(f"Font '{font_filename}' already exists locally.")
+        return font_path
+
+    # --- Download Logic ---
+    # If the file doesn't exist, download it.
+    print(f"Downloading font '{font_filename}' to '{font_path}'...")
+    try:
+        # Make the request to the URL.
+        with urllib.request.urlopen(FONT_URL) as response:
+            # Check if the request was successful.
+            if response.status != 200:
+                raise FileNotFoundError(
+                    f"Failed to download font. HTTP Status: {response.status}"
+                )
+            
+            # Write the content of the response to the local file in binary mode.
+            with open(font_path, 'wb') as f:
+                f.write(response.read())
+
+    except URLError as e:
+        # Handle network errors (e.g., no internet connection).
+        raise FileNotFoundError(
+            f"Failed to download font from '{FONT_URL}'. "
+            f"Please check your internet connection. Error: {e}"
+        ) from e
+
+    return font_path
+
 def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     """
     Apply corporate styling to *ax*.
@@ -249,7 +312,7 @@ def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     # ------------------------------------------------------------
     # 1. Load corporate font (once per interpreter session)
     # ------------------------------------------------------------
-    otf_file_path = get_otf_path()
+    otf_file_path = get_github_otf_path()
     font_properties = fm.FontProperties(fname=str(otf_file_path))
     # Register font globally with Matplotlib (no-op if already added)
     fm.fontManager.addfont(str(otf_file_path))
