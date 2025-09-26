@@ -7,7 +7,7 @@ import requests
 import json
 from packaging import version
 
-__version__ = "1.1.13"
+__version__ = "1.1.14"
 
 
 def check_for_updates():

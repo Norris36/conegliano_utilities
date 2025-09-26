@@ -1,4 +1,4 @@
-import pandas 
+import pandas as pd
 import os
 
 def get_folder_sizes(root_folder):
