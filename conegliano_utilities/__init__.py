@@ -7,7 +7,7 @@ import requests
 import json
 from packaging import version
 
-__version__ = "1.1.12"
+__version__ = "1.1.13"
 
 
 def check_for_updates():
@@ -59,6 +59,9 @@ from .core import *
 from .data_utils import *
 from .web_utils import *
 from .workout import *
+
+# Print version info on import
+print_version_info()
 
 # Define what gets imported with "from conegliano_utilities import *"
 __all__ = [

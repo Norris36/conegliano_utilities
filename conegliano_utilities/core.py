@@ -8,6 +8,33 @@ import pandas as pd
 from tqdm import tqdm
 
 
+def print_version_info() -> None:
+    """
+    Print current package version and last update timestamp.
+
+    ~~~
+    • Imports version from package __init__.py
+    • Gets current timestamp for load time
+    • Displays formatted version information
+    • Shows when module was last loaded
+    • Provides visual separator for clarity
+    ~~~
+
+    Returns type: None (NoneType) - prints version information to console
+    """
+    try:
+        from . import __version__
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"\n{'='*50}")
+        print(f"🚀 Conegliano Utilities v{__version__}")
+        print(f"📅 Loaded at: {current_time}")
+        print(f"{'='*50}\n")
+    except ImportError:
+        print("⚠️  Version information not available")
+    except Exception as e:
+        print(f"⚠️  Error loading version: {e}")
+
+
 def get_functions_dataframe(filename: str = 'conegliano_utilities.py') -> pd.DataFrame:
     """
     Extracts function names, docstrings, input and output variable types from a Python file.
