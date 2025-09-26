@@ -1,2 +1,3 @@
 - in every commit always increase the version by 0.01
+- every time the .99 we increment so 1.0.99 becomes 1.99.99 would become 2.0
 - always ensure to update the test_notebook with caller functions of the appneded code
