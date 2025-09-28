@@ -4,10 +4,9 @@ Conegliano Utilities - Personal utility functions for data science and developme
 
 import warnings
 import requests
-import json
 from packaging import version
 
-__version__ = "1.1.14"
+__version__ = "1.1.16"
 
 
 def check_for_updates():
@@ -38,7 +37,8 @@ def check_for_updates():
                     f"\n🔔 UPDATE AVAILABLE 🔔\n"
                     f"Current version: {current_version}\n"
                     f"Latest version: {latest_version}\n"
-                    f"Run: pip install --upgrade git+https://github.com/Norris36/conegliano_utilities.git\n",
+                    "Run: pip install --upgrade "
+                    "git+https://github.com/Norris36/conegliano_utilities.git\n",
                     UserWarning,
                     stacklevel=2,
                 )
@@ -59,6 +59,7 @@ from .core import *
 from .data_utils import *
 from .web_utils import *
 from .workout import *
+from .issue_logger import *
 
 # Print version info on import
 print_version_info()
@@ -86,4 +87,11 @@ __all__ = [
     "create_workout_from_github",
     "load_exercise_data_from_github",
     "load_latest_workout_from_github",
+    # Issue logging utilities
+    "create_github_issue",
+    "create_debug_issue",
+    "log_error_and_create_issue",
+    "quick_issue",
+    "format_system_info",
+    "format_stack_trace",
 ]
