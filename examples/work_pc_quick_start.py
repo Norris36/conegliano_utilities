@@ -14,7 +14,7 @@ def setup_once():
     print("🔧 SETTING UP GITHUB TOKEN...")
 
     # Replace this with your actual token
-    github_token = "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"
+    github_token = "YOUR_GITHUB_TOKEN_HERE"
 
     try:
         from conegliano_utilities.issue_config import setup_token_config
