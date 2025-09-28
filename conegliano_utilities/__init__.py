@@ -6,7 +6,7 @@ import warnings
 import requests
 from packaging import version
 
-__version__ = "1.1.16"
+__version__ = "1.1.17"
 
 
 def check_for_updates():
@@ -60,6 +60,9 @@ from .data_utils import *
 from .web_utils import *
 from .workout import *
 from .issue_logger import *
+from .issue_config import *
+from .local_issue_store import *
+from .email_issue_reporter import *
 
 # Print version info on import
 print_version_info()
@@ -92,6 +95,20 @@ __all__ = [
     "create_debug_issue",
     "log_error_and_create_issue",
     "quick_issue",
+    "smart_issue",
     "format_system_info",
     "format_stack_trace",
+    # Issue configuration
+    "get_github_token",
+    "setup_token_config",
+    "set_hardcoded_token",
+    # Local issue storage
+    "store_issue_locally",
+    "list_local_issues",
+    "sync_local_issues_to_github",
+    "create_local_debug_issue",
+    # Email issue reporting
+    "send_issue_email",
+    "create_mailto_link",
+    "print_email_issue",
 ]

@@ -11,6 +11,8 @@ from typing import Dict, Optional, Any, List
 import requests
 import os
 import subprocess
+from .issue_config import get_github_token
+from .local_issue_store import store_issue_locally, create_local_debug_issue
 
 
 def create_github_issue(
@@ -42,14 +44,14 @@ def create_github_issue(
     Returns type: issue_data (Dict[str, Any]) - GitHub API response with
         issue URL and metadata
     """
-    # Get GitHub token from environment or parameter
+    # Get GitHub token from multiple sources
     if not github_token:
-        github_token = os.getenv("GITHUB_TOKEN")
+        github_token = get_github_token()
 
     if not github_token:
         raise ValueError(
             "GitHub token is required. Set GITHUB_TOKEN environment "
-            "variable or pass as parameter."
+            "variable, save with setup_token_config(), or set hardcoded fallback."
         )
 
     # Default labels for debugging issues
@@ -312,17 +314,77 @@ def log_error_and_create_issue(
         return None
 
 
+def smart_issue(
+    title: str,
+    description: str = "",
+    labels: Optional[List[str]] = None,
+    force_local: bool = False,
+    priority: str = "medium"
+) -> Dict[str, Any]:
+    """
+    Smart issue creation - tries GitHub first, falls back to local storage.
+
+    ~~~
+    • Attempts GitHub issue creation if token is available
+    • Automatically falls back to local storage on failure
+    • Handles work environment restrictions gracefully
+    • Returns consistent result format regardless of storage method
+    ~~~
+
+    Args:
+        title (str): Issue title
+        description (str): Issue description
+        labels (List[str], optional): Issue labels
+        force_local (bool): Skip GitHub and use local storage only
+        priority (str): Priority for local issues (low, medium, high, critical)
+
+    Returns type: result (Dict[str, Any]) - issue creation result with metadata
+    """
+    if force_local:
+        print("🗂️  Creating local issue (forced)...")
+        return store_issue_locally(title, description, labels, priority)
+
+    try:
+        # Try GitHub first
+        github_token = get_github_token()
+        if github_token:
+            print("🌐 Trying GitHub...")
+            result = create_github_issue(title=title, body=description, labels=labels, github_token=github_token)
+
+            if result.get("success"):
+                print(f"✅ GitHub issue created: {result['issue_url']}")
+                return result
+            else:
+                print(f"⚠️  GitHub failed: {result.get('message', 'Unknown error')}")
+                print("📱 Falling back to local storage...")
+        else:
+            print("🔑 No GitHub token found, using local storage...")
+
+    except Exception as e:
+        print(f"⚠️  GitHub error: {str(e)}")
+        print("📱 Falling back to local storage...")
+
+    # Fallback to local storage
+    local_result = store_issue_locally(title, description, labels, priority)
+    if local_result.get("success"):
+        print(f"✅ Local issue stored: {local_result['file_path']}")
+    else:
+        print(f"❌ Local storage failed: {local_result.get('error', 'Unknown error')}")
+
+    return local_result
+
+
 def quick_issue(
     title: str, description: str = "", labels: Optional[List[str]] = None
 ) -> None:
     """
-    Quick helper to create a simple GitHub issue with minimal setup.
+    Quick helper to create a simple issue with automatic fallback.
 
     ~~~
-    • Creates GitHub issue with title and description
-    • Uses default labels if none provided
-    • Prints issue URL for immediate access
-    • Handles errors gracefully with user feedback
+    • Uses smart_issue for automatic GitHub/local fallback
+    • Simplified interface for quick issue creation
+    • Prints results for immediate feedback
+    • Handles all error cases gracefully
     ~~~
 
     Args:
@@ -330,15 +392,7 @@ def quick_issue(
         description (str): Issue description
         labels (List[str], optional): Issue labels
 
-    Returns type: None (NoneType) - prints results and issue URL
+    Returns type: None (NoneType) - prints results and issue location
     """
-    try:
-        result = create_github_issue(title=title, body=description, labels=labels)
-
-        if result.get("success"):
-            print(f"✅ Issue created: {result['issue_url']}")
-        else:
-            print(f"❌ Failed: {result.get('message', 'Unknown error')}")
-
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
+    result = smart_issue(title, description, labels)
+    # Results already printed by smart_issue
