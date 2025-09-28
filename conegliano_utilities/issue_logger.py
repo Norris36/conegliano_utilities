@@ -399,3 +399,15 @@ def quick_issue(
     """
     result = smart_issue(title, description, labels)
     # Results already printed by smart_issue
+
+
+# Export all public functions
+__all__ = [
+    'create_github_issue',
+    'format_system_info',
+    'format_stack_trace',
+    'create_debug_issue',
+    'log_error_and_create_issue',
+    'smart_issue',
+    'quick_issue'
+]

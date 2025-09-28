@@ -6,7 +6,7 @@ import warnings
 import requests
 from packaging import version
 
-__version__ = "1.1.18"
+__version__ = "1.1.19"
 
 
 def check_for_updates():
@@ -63,6 +63,9 @@ from .issue_logger import *
 from .issue_config import *
 from .local_issue_store import *
 from .email_issue_reporter import *
+from .global_issue_logger import *
+from .code_extractor import *
+from .issue_solver import *
 
 # Print version info on import
 print_version_info()
@@ -111,4 +114,30 @@ __all__ = [
     "send_issue_email",
     "create_mailto_link",
     "print_email_issue",
+    # Global issue logging (works from anywhere)
+    "global_issue",
+    "quick_global_issue",
+    "list_repo_issues",
+    "global_issue_context",
+    "issue",  # Short alias for global_issue
+    # Code extraction utilities
+    "extract_function_code",
+    "copy_function_to_clipboard",
+    "search_function_in_directory",
+    "find_function_in_file",
+    "list_functions_in_file",
+    "quick_function_copy",
+    "copy_func",  # Alias
+    "find_func",  # Alias
+    "get_code",   # Alias
+    # Issue solving with code integration
+    "issue_solved",
+    "get_open_issues",
+    "display_open_issues",
+    "add_comment_to_issue",
+    "close_issue",
+    "quick_solve",
+    "solve",       # Alias
+    "quick_solution",  # Alias
+    "list_issues", # Alias
 ]
