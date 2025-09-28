@@ -6,7 +6,7 @@ import warnings
 import requests
 from packaging import version
 
-__version__ = "1.1.17"
+__version__ = "1.1.18"
 
 
 def check_for_updates():

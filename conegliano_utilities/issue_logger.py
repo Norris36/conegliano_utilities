@@ -11,8 +11,7 @@ from typing import Dict, Optional, Any, List
 import requests
 import os
 import subprocess
-from .issue_config import get_github_token
-from .local_issue_store import store_issue_locally, create_local_debug_issue
+# Remove circular imports - import functions when needed
 
 
 def create_github_issue(
@@ -46,6 +45,7 @@ def create_github_issue(
     """
     # Get GitHub token from multiple sources
     if not github_token:
+        from .issue_config import get_github_token
         github_token = get_github_token()
 
     if not github_token:
@@ -342,10 +342,12 @@ def smart_issue(
     """
     if force_local:
         print("🗂️  Creating local issue (forced)...")
+        from .local_issue_store import store_issue_locally
         return store_issue_locally(title, description, labels, priority)
 
     try:
         # Try GitHub first
+        from .issue_config import get_github_token
         github_token = get_github_token()
         if github_token:
             print("🌐 Trying GitHub...")
@@ -365,6 +367,7 @@ def smart_issue(
         print("📱 Falling back to local storage...")
 
     # Fallback to local storage
+    from .local_issue_store import store_issue_locally
     local_result = store_issue_locally(title, description, labels, priority)
     if local_result.get("success"):
         print(f"✅ Local issue stored: {local_result['file_path']}")
