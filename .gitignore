@@ -150,3 +150,9 @@ logs/
 *.bak
 *.backup
 *~
+
+# Private finance app (moved to separate repository)
+finance_app/
+
+# Workout data files (test artifacts)
+data/workouts/*.csv
