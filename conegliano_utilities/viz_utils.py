@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import difflib                               # fuzzy string matching (nice error msgs)
+import colorsys                              # HSL color space conversions
 
 # THIRD-PARTY
 import matplotlib as mpl # main plotting lib
@@ -573,7 +574,68 @@ def smart_text_labels(ax,
 
 ###
 ### Colors
-### 
+###
+
+def generate_shades(hex_color: str, num_shades: int = 5) -> list[str]:
+    """
+    Generates a list of darker shades for a given hex color.
+
+    This function converts a hex color string into the HSL (Hue, Lightness, Saturation)
+    color space. It then creates a series of new colors by decreasing the "Lightness"
+    value, effectively producing darker shades of the original color. These new HSL
+    colors are then converted back to hex format.
+
+    Args:
+        hex_color (str): The base color in hex format (e.g., '#3498db' or '3498db').
+        num_shades (int): The number of darker shades to generate. Defaults to 5.
+
+    Returns:
+        list[str]: A list of hex color strings representing the shades, from darkest to lightest (the original color).
+    """
+    # Line 1: Remove the '#' prefix from the hex string if it exists.
+    # The lstrip('#') method removes any leading '#' characters.
+    clean_hex = hex_color.lstrip('#')
+
+    # Line 2: Convert the 6-character hex string into three separate integer values for Red, Green, and Blue.
+    # We parse the string in chunks of 2 characters (e.g., '34', '98', 'db') and convert each
+    # hexadecimal chunk to its corresponding integer value (0-255).
+    rgb = tuple(int(clean_hex[i:i+2], 16) for i in (0, 2, 4))
+
+    # Line 3: Convert the RGB tuple (e.g., (52, 152, 219)) to the HLS (Hue, Lightness, Saturation) color space.
+    # The colorsys library requires RGB values to be normalized to a 0-1 scale, so we divide each by 255.
+    # Mathematics: HLS is a cylindrical representation of colors. 'Lightness' is the central axis,
+    # from black (0) to white (1). By changing only Lightness, we create shades and tints without altering the base color (Hue).
+    h, l, s = colorsys.rgb_to_hls(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+
+    # Line 4: Generate a list to store the resulting hex codes for the shades.
+    shades_hex = []
+
+    # Line 5: Create an array of evenly spaced "Lightness" values.
+    # We use numpy's linspace to create `num_shades` values starting from a dark value (l * 0.2) up to the original lightness (l).
+    # This creates the steps for our gradient of shades.
+    lightness_steps = np.linspace(l * 0.2, l, num_shades)
+
+    # Line 6: Loop through each of the new lightness values to create the corresponding shade.
+    for step in lightness_steps:
+        # Line 7: Convert the HLS color (with the new, modified lightness) back to an RGB tuple.
+        # The hue (h) and saturation (s) remain constant to preserve the original color's character.
+        new_rgb_normalized = colorsys.hls_to_rgb(h, step, s)
+
+        # Line 8: Convert the normalized RGB values (0-1) back to the standard 0-255 scale.
+        # We multiply by 255 and round to the nearest integer.
+        new_rgb = tuple(int(c * 255) for c in new_rgb_normalized)
+
+        # Line 9: Format the RGB tuple back into a hex string.
+        # The format specifier '{:02x}' ensures each R, G, B value is a two-digit lowercase hex number (e.g., 10 becomes '0a').
+        # We then join them and prepend with a '#' to form the final hex code.
+        hex_code = f"#{new_rgb[0]:02x}{new_rgb[1]:02x}{new_rgb[2]:02x}"
+
+        # Line 10: Add the newly generated hex code to our list of shades.
+        shades_hex.append(hex_code)
+
+    # Line 11: Return the complete list of shades.
+    return shades_hex
+
 
 def highlight_values(dataframe, column, command, amount):        
     """
@@ -787,6 +849,74 @@ def create_stacked_bar(ax, working_dataframe, color, x_column = 'top_manager', y
             bottom += working_dataframe[column]
             
     # Return the modified axes object
+    return ax
+
+
+def create_stacked_bar_chart(ax, working_dataframe: pd.DataFrame, primary_color: str = '#00447E', horizontal: bool = True, bar_width: float = 0.8):
+    """
+    Creates a versatile horizontal or vertical stacked bar chart from a DataFrame.
+
+    This function automatically uses the first column for categories and all other
+    numerical columns for stacked segments. It sorts the categories to ensure a logical
+    order (e.g., chronological). It supports both horizontal and vertical orientations.
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes object to draw the chart on.
+        working_dataframe (pd.DataFrame): DataFrame where the first column is the category
+                                          and subsequent columns are numerical values.
+        primary_color (str, optional): Base hex color for the palette. Defaults to '#00447E'.
+        horizontal (bool, optional): If True, creates a horizontal bar chart.
+                                     If False, creates a vertical bar chart. Defaults to True.
+        bar_width (float, optional): The width (or height for horizontal) of the bars.
+                                     Defaults to 0.8.
+
+    Returns:
+        matplotlib.axes.Axes: The modified axes object with the chart.
+    """
+    # Line 1: Identify the category column (first column) and value columns (the rest).
+    category_column = working_dataframe.columns[0]
+    value_columns = working_dataframe.columns[1:]
+
+    # Line 2: Sort the DataFrame by the category column to ensure a consistent, logical order.
+    # For dates or numbers, this creates a chronological or numerical axis.
+    df_sorted = working_dataframe.sort_values(by=category_column, ascending=True)
+
+    # Line 3: Verify that there are value columns to plot.
+    if len(value_columns) == 0:
+        raise ValueError("DataFrame must have at least two columns: one for categories and one for values.")
+
+    # Line 4: Generate a color palette from the primary color.
+    colors = generate_shades(primary_color, num_shades=len(value_columns))
+    color_map = {col: color for col, color in zip(value_columns, colors)}
+
+    # Line 5: Get the sorted category labels for the axis.
+    categories = df_sorted[category_column]
+
+    # Line 6: Check the orientation and plot accordingly.
+    if horizontal:
+        # Line 7: For horizontal bars, initialize a `left` offset array to stack segments from left to right.
+        left = np.zeros(len(df_sorted))
+        # Line 8: Loop through each value column to plot its segment.
+        for column in value_columns:
+            values = df_sorted[column]
+            # Line 9: Plot the horizontal bar segment. `left` determines its starting position.
+            ax.barh(categories, values, left=left, color=color_map[column], height=bar_width, label=column)
+            # Line 10: Update the `left` offset for the next segment.
+            left += values.values
+        # Line 11: Invert the y-axis so that categories (like dates) are ascending from bottom to top.
+        ax.invert_yaxis()
+    else:
+        # Line 12: For vertical bars, initialize a `bottom` offset array to stack segments upwards.
+        bottom = np.zeros(len(df_sorted))
+        # Line 13: Loop through each value column to plot its segment.
+        for column in value_columns:
+            values = df_sorted[column]
+            # Line 14: Plot the vertical bar segment. `bottom` determines its starting position.
+            ax.bar(categories, values, bottom=bottom, color=color_map[column], width=bar_width, label=column)
+            # Line 15: Update the `bottom` offset for the next segment.
+            bottom += values.values
+
+    # Line 16: Return the modified axes object.
     return ax
 
 
