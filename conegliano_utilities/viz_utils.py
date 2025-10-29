@@ -108,6 +108,137 @@ _PALETTES: dict[str, dict[str, str]] = {
     }
 }
 
+# ────────────────────────────────────────────────────────────────
+# 2. GLOBAL DEFAULTS FOR FIGURE SIZE AND FONTS
+# ────────────────────────────────────────────────────────────────
+# These global variables control the default size and font settings
+# for all plots created with setup_plot() and setup_subplots().
+# Use the getter/setter functions below to customize these values.
+
+_GLOBAL_FIGSIZE: tuple[int, int] = (12, 6)
+_GLOBAL_FONT_SIZE_BODY: int = 12
+_GLOBAL_FONT_SIZE_HEADER: int = 16
+
+# ────────────────────────────────────────────────────────────────
+# GETTERS - Retrieve current global settings
+# ────────────────────────────────────────────────────────────────
+
+def get_global_figsize() -> tuple[int, int]:
+    """
+    Get the current global default figure size.
+
+    Returns:
+        tuple[int, int]: Figure size as (width, height) in inches.
+    """
+    return _GLOBAL_FIGSIZE
+
+def get_global_font_size_body() -> int:
+    """
+    Get the current global default body font size.
+
+    Returns:
+        int: Font size in points for body text (labels, ticks, annotations).
+    """
+    return _GLOBAL_FONT_SIZE_BODY
+
+def get_global_font_size_header() -> int:
+    """
+    Get the current global default header font size.
+
+    Returns:
+        int: Font size in points for headers (titles, legend titles).
+    """
+    return _GLOBAL_FONT_SIZE_HEADER
+
+# ────────────────────────────────────────────────────────────────
+# SETTERS - Update global settings
+# ────────────────────────────────────────────────────────────────
+
+def set_global_figsize(width: int, height: int) -> None:
+    """
+    Set the global default figure size for all future plots.
+
+    Args:
+        width (int): Figure width in inches.
+        height (int): Figure height in inches.
+
+    Example:
+        >>> set_global_figsize(16, 10)  # All plots will now be 16x10 by default
+    """
+    global _GLOBAL_FIGSIZE
+    _GLOBAL_FIGSIZE = (width, height)
+
+def set_global_font_size_body(size: int) -> None:
+    """
+    Set the global default body font size for all future plots.
+
+    Args:
+        size (int): Font size in points for body text.
+
+    Example:
+        >>> set_global_font_size_body(14)  # All body text will be 14pt
+    """
+    global _GLOBAL_FONT_SIZE_BODY
+    _GLOBAL_FONT_SIZE_BODY = size
+
+def set_global_font_size_header(size: int) -> None:
+    """
+    Set the global default header font size for all future plots.
+
+    Args:
+        size (int): Font size in points for headers.
+
+    Example:
+        >>> set_global_font_size_header(18)  # All headers will be 18pt
+    """
+    global _GLOBAL_FONT_SIZE_HEADER
+    _GLOBAL_FONT_SIZE_HEADER = size
+
+def set_global_plot_defaults(figsize: tuple[int, int] = None,
+                             font_size_body: int = None,
+                             font_size_header: int = None) -> None:
+    """
+    Convenience function to set multiple global plot defaults at once.
+
+    Args:
+        figsize (tuple[int, int], optional): Figure size as (width, height).
+        font_size_body (int, optional): Body font size in points.
+        font_size_header (int, optional): Header font size in points.
+
+    Example:
+        >>> set_global_plot_defaults(figsize=(16, 10), font_size_body=14, font_size_header=18)
+        >>> # OR set just one parameter
+        >>> set_global_plot_defaults(font_size_body=16)
+    """
+    if figsize is not None:
+        set_global_figsize(figsize[0], figsize[1])
+    if font_size_body is not None:
+        set_global_font_size_body(font_size_body)
+    if font_size_header is not None:
+        set_global_font_size_header(font_size_header)
+
+def get_global_plot_defaults() -> dict:
+    """
+    Get all current global plot defaults as a dictionary.
+
+    Returns:
+        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header'.
+
+    Example:
+        >>> defaults = get_global_plot_defaults()
+        >>> print(defaults)
+        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16}
+    """
+    return {
+        'figsize': _GLOBAL_FIGSIZE,
+        'font_size_body': _GLOBAL_FONT_SIZE_BODY,
+        'font_size_header': _GLOBAL_FONT_SIZE_HEADER
+    }
+
+# ────────────────────────────────────────────────────────────────
+# COLOR PALETTE FUNCTIONS
+# ────────────────────────────────────────────────────────────────
+
 def get_color_palette(palette_name: str = "default", /) -> dict[str, str]:
     """
     One-line description
@@ -174,7 +305,7 @@ def get_figsize(name = 'default'):
         raise ValueError(f"Unknown figure size '{name}'. Available sizes: {list(sizes.keys())}")
     return sizes.get(name, sizes['default'])
 
-def set_fontsizes(fig, ax, font_size_body=12, font_size_header=None):
+def set_fontsizes(fig, ax, font_size_body=None, font_size_header=None):
     """
     Uniformly set two different font sizes on an existing Matplotlib
     figure/axes pair.
@@ -183,18 +314,22 @@ def set_fontsizes(fig, ax, font_size_body=12, font_size_header=None):
     ----------
     fig : matplotlib.figure.Figure
     ax  : matplotlib.axes.Axes     (any axes object that lives in *fig*)
-    font_size_body   : int | float
+    font_size_body   : int | float, optional
         Size in points for tick labels, axis labels, annotation texts, etc.
+        If None, uses the global default set by set_global_font_size_body().
     font_size_header : int | float, optional
         Size in points for figure title, axes titles, legend titles.
-        If None, defaults to font_size_body + 4.
+        If None, uses the global default set by set_global_font_size_header().
 
     Returns
     -------
     (fig, ax) : the same objects for convenient chaining.
     """
+    # Use global defaults if not specified
+    if font_size_body is None:
+        font_size_body = _GLOBAL_FONT_SIZE_BODY
     if font_size_header is None:
-        font_size_header = font_size_body + 4
+        font_size_header = _GLOBAL_FONT_SIZE_HEADER
 
     # ------------------------------------------------------------------
     # 1)  Update the defaults so any *future* text will inherit new sizes
@@ -337,7 +472,7 @@ def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     # -------- figure-wide font ----------------------------------
     plt.rcParams["font.family"] = font_properties.get_name()
 
-def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
+def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
     """
     One-line description
         Create a single (fig, ax) pair pre-styled with the company theme.
@@ -345,7 +480,7 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
     Summary
         * Loads the corporate font (once) from the `resources/fonts`
           directory. The font file is expected to be named
-          'CorporateSans.otf'.  
+          'CorporateSans.otf'.
         * Retrieves the requested colour palette via `get_color_palette`.
         * Applies background, grid, and text colours uniformly.
         * Returns the freshly created Figure and Axes objects.
@@ -354,14 +489,21 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
     ----
     color   : str
         Palette name.  Case-insensitive, minor typos allowed.
-    figsize : tuple[int, int]
+    figsize : tuple[int, int], optional
         Size in inches, forwarded to `plt.subplots`.
+        If None, uses the global default set by set_global_figsize().
 
     Returns
     -------
     fig, ax : matplotlib.figure.Figure, matplotlib.axes.Axes
         The newly created figure & axes ready for plotting.
     """
+    # ------------------------------------------------------------
+    # 1. Use global figsize if not specified
+    # ------------------------------------------------------------
+    if figsize is None:
+        figsize = _GLOBAL_FIGSIZE
+
     # ------------------------------------------------------------
     # 2. Retrieve colour palette (handles user typos)
     # ------------------------------------------------------------
@@ -372,6 +514,11 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
     # ------------------------------------------------------------
     fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
     _apply_style(fig, ax, colors)
+
+    # ------------------------------------------------------------
+    # 4. Apply global font sizes
+    # ------------------------------------------------------------
+    set_fontsizes(fig, ax)
 
     return fig, ax
 
@@ -931,7 +1078,7 @@ def setup_subplots(
     color: str = "default",
     sharex=False,
     sharey=False,
-    figsize=(10, 6),
+    figsize=None,
     **kwargs,):
     """
     Create a grid of subplots that already follow the corporate style.
@@ -941,14 +1088,18 @@ def setup_subplots(
     nrows, ncols : int    – handed to `plt.subplots`
     color        : str    – palette name passed to `get_color_palette`
     sharex/sharey: bool   – forwarded to `plt.subplots`
-    figsize      : tuple  – inches, forwarded to `plt.subplots`
+    figsize      : tuple, optional  – inches, forwarded to `plt.subplots`
+                   If None, uses the global default set by set_global_figsize().
     **kwargs             – any other kwarg accepted by `plt.subplots`
 
     Returns
     -------
     fig, axs     – same objects as `plt.subplots` would return
     """
-    
+    # Use global figsize if not specified
+    if figsize is None:
+        figsize = _GLOBAL_FIGSIZE
+
     colors = get_color_palette(palette_name=color)
 
     fig, axs = plt.subplots(
@@ -962,6 +1113,15 @@ def setup_subplots(
     )
 
     _apply_style(fig, axs, colors)
+
+    # Apply global font sizes to all axes
+    # axs might be a single Axes or an array of Axes
+    if isinstance(axs, np.ndarray):
+        for ax in axs.flat:
+            set_fontsizes(fig, ax)
+    else:
+        set_fontsizes(fig, axs)
+
     return fig, axs
 
 def _tag_figure(fig, font_properties, colors):
