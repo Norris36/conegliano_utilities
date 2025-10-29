@@ -109,15 +109,43 @@ _PALETTES: dict[str, dict[str, str]] = {
 }
 
 # ────────────────────────────────────────────────────────────────
-# 2. GLOBAL DEFAULTS FOR FIGURE SIZE AND FONTS
+# 2. STANDARD PRESETS FOR FIGURE SIZES AND FONTS
+# ────────────────────────────────────────────────────────────────
+# Predefined configurations optimized for different output formats.
+# PowerPoint dimensions are in inches and match standard slide sizes.
+
+STANDARD_FIGSIZES = {
+    'powerpoint_full': (33.83, 19.05),      # Full PowerPoint slide (16:9)
+    'powerpoint_center': (31.56, 13.36),    # Center content area
+    'powerpoint_half': (15.49, 12.93),      # Half slide (side-by-side)
+    'default': (12, 6),                     # Standard notebook size
+    'small': (8, 6),                        # Compact display
+    'large': (16, 10),                      # Large display
+    'square': (10, 10),                     # Square format
+    'wide': (16, 6),                        # Wide format
+    'poster': (24, 36),                     # Academic poster
+}
+
+STANDARD_FONTS = {
+    'powerpoint_full': {'header': 45, 'body': 35},
+    'powerpoint_center': {'header': 40, 'body': 30},
+    'powerpoint_half': {'header': 32, 'body': 24},
+    'default': {'header': 16, 'body': 12},
+    'small': {'header': 14, 'body': 10},
+    'large': {'header': 20, 'body': 16},
+    'poster': {'header': 72, 'body': 48},
+}
+
+# ────────────────────────────────────────────────────────────────
+# 3. GLOBAL DEFAULTS FOR FIGURE SIZE AND FONTS
 # ────────────────────────────────────────────────────────────────
 # These global variables control the default size and font settings
 # for all plots created with setup_plot() and setup_subplots().
 # Use the getter/setter functions below to customize these values.
 
-_GLOBAL_FIGSIZE: tuple[int, int] = (12, 6)
-_GLOBAL_FONT_SIZE_BODY: int = 12
-_GLOBAL_FONT_SIZE_HEADER: int = 16
+_GLOBAL_FIGSIZE: tuple[int, int] = STANDARD_FIGSIZES['default']
+_GLOBAL_FONT_SIZE_BODY: int = STANDARD_FONTS['default']['body']
+_GLOBAL_FONT_SIZE_HEADER: int = STANDARD_FONTS['default']['header']
 
 # ────────────────────────────────────────────────────────────────
 # GETTERS - Retrieve current global settings
@@ -234,6 +262,118 @@ def get_global_plot_defaults() -> dict:
         'font_size_body': _GLOBAL_FONT_SIZE_BODY,
         'font_size_header': _GLOBAL_FONT_SIZE_HEADER
     }
+
+# ────────────────────────────────────────────────────────────────
+# PRESET FUNCTIONS - Work with standard presets
+# ────────────────────────────────────────────────────────────────
+
+def list_available_presets() -> list[str]:
+    """
+    Get a list of all available preset names.
+
+    Returns:
+        list[str]: List of preset names that can be used with apply_preset().
+
+    Example:
+        >>> presets = list_available_presets()
+        >>> print(presets)
+        ['powerpoint_full', 'powerpoint_center', 'powerpoint_half', 'default', 'small', 'large', 'poster']
+    """
+    return list(STANDARD_FIGSIZES.keys())
+
+def get_preset_config(preset_name: str) -> dict:
+    """
+    Get the configuration for a specific preset without applying it.
+
+    Args:
+        preset_name (str): Name of the preset (e.g., 'powerpoint_full', 'default').
+
+    Returns:
+        dict: Dictionary with 'figsize', 'font_size_body', 'font_size_header'.
+
+    Raises:
+        ValueError: If preset_name is not found.
+
+    Example:
+        >>> config = get_preset_config('powerpoint_full')
+        >>> print(config)
+        {'figsize': (33.83, 19.05), 'font_size_body': 35, 'font_size_header': 45}
+    """
+    if preset_name not in STANDARD_FIGSIZES:
+        available = ', '.join(list_available_presets())
+        raise ValueError(f"Preset '{preset_name}' not found. Available presets: {available}")
+
+    return {
+        'figsize': STANDARD_FIGSIZES[preset_name],
+        'font_size_body': STANDARD_FONTS[preset_name]['body'],
+        'font_size_header': STANDARD_FONTS[preset_name]['header']
+    }
+
+def apply_preset(preset_name: str) -> None:
+    """
+    Apply a standard preset configuration to global defaults.
+
+    This is the main function to use when you want to quickly switch between
+    different output formats (e.g., PowerPoint, notebook, poster).
+
+    Args:
+        preset_name (str): Name of the preset to apply. Options include:
+            - 'powerpoint_full': Full PowerPoint slide (33.83x19.05, fonts: 45/35)
+            - 'powerpoint_center': Center content area (31.56x13.36, fonts: 40/30)
+            - 'powerpoint_half': Half slide (15.49x12.93, fonts: 32/24)
+            - 'default': Standard notebook (12x6, fonts: 16/12)
+            - 'small': Compact display (8x6, fonts: 14/10)
+            - 'large': Large display (16x10, fonts: 20/16)
+            - 'square': Square format (10x10, fonts: 16/12)
+            - 'wide': Wide format (16x6, fonts: 16/12)
+            - 'poster': Academic poster (24x36, fonts: 72/48)
+
+    Raises:
+        ValueError: If preset_name is not found.
+
+    Example:
+        >>> # Set up for PowerPoint export
+        >>> apply_preset('powerpoint_full')
+        >>> fig, ax = setup_plot()  # Will use PowerPoint dimensions and fonts
+
+        >>> # Switch back to notebook mode
+        >>> apply_preset('default')
+
+        >>> # See all available presets
+        >>> print(list_available_presets())
+    """
+    config = get_preset_config(preset_name)
+    set_global_plot_defaults(
+        figsize=config['figsize'],
+        font_size_body=config['font_size_body'],
+        font_size_header=config['font_size_header']
+    )
+    print(f"✅ Applied preset '{preset_name}':")
+    print(f"   Figsize: {config['figsize']}")
+    print(f"   Fonts: header={config['font_size_header']}, body={config['font_size_body']}")
+
+def print_all_presets() -> None:
+    """
+    Print a formatted table of all available presets with their configurations.
+
+    Example:
+        >>> print_all_presets()
+        Available Presets:
+        ==================
+        powerpoint_full     : (33.83, 19.05) | Header: 45pt | Body: 35pt
+        powerpoint_center   : (31.56, 13.36) | Header: 40pt | Body: 30pt
+        ...
+    """
+    print("\n📋 Available Presets:")
+    print("=" * 70)
+
+    for preset_name in sorted(STANDARD_FIGSIZES.keys()):
+        figsize = STANDARD_FIGSIZES[preset_name]
+        fonts = STANDARD_FONTS[preset_name]
+        print(f"{preset_name:20} : {figsize} | Header: {fonts['header']:2}pt | Body: {fonts['body']:2}pt")
+
+    print("\n💡 Usage: apply_preset('preset_name')")
+    print("=" * 70)
 
 # ────────────────────────────────────────────────────────────────
 # COLOR PALETTE FUNCTIONS
