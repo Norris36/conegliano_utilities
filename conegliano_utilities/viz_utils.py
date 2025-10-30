@@ -662,6 +662,50 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
 
     return fig, ax
 
+def simple_setup_plot(figsize: tuple[int, int] = None):
+    """
+    Lightweight version of setup_plot - minimal styling, maximum simplicity.
+
+    Creates a matplotlib figure with basic styling using the default color palette.
+    Perfect for quick plots without the full corporate styling overhead.
+
+    Args:
+        figsize (tuple[int, int], optional): Figure size in inches.
+            If None, uses global default.
+
+    Returns:
+        tuple: (fig, ax, palette, shades)
+            - fig: matplotlib Figure
+            - ax: matplotlib Axes
+            - palette: Default color palette dict (easy access to colors)
+            - shades: Function to generate color shades
+
+    Example:
+        >>> fig, ax, palette, shades = simple_setup_plot()
+        >>> ax.plot(x, y, color=palette['Primary'])
+        >>> colors = shades(palette['Primary'], 5)
+        >>> ax.bar(x, y, color=colors[0])
+    """
+    # Use global figsize if not specified
+    figsize = figsize or _GLOBAL_FIGSIZE
+
+    # Get default palette
+    palette = _PALETTES['default']
+
+    # Create basic figure
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    # Apply minimal styling
+    fig.patch.set_facecolor(palette['Background'])
+    ax.set_facecolor(palette['Background'])
+    ax.spines['top'].set_color(palette['Secondary'])
+    ax.spines['bottom'].set_color(palette['Secondary'])
+    ax.spines['left'].set_color(palette['Secondary'])
+    ax.spines['right'].set_color(palette['Secondary'])
+    ax.tick_params(colors=palette['Secondary'])
+
+    return fig, ax, palette, generate_shades
+
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
     return str(pathlib.Path().absolute())
