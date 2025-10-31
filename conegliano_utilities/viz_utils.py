@@ -11,6 +11,9 @@ import numpy as np
 from tqdm import tqdm
 import difflib                               # fuzzy string matching (nice error msgs)
 import colorsys                              # HSL color space conversions
+import tempfile
+import urllib.request
+from urllib.error import URLError
 
 # THIRD-PARTY
 import matplotlib as mpl # main plotting lib
@@ -705,6 +708,112 @@ def simple_setup_plot(figsize: tuple[int, int] = None):
     ax.tick_params(colors=palette['Secondary'])
 
     return fig, ax, palette, generate_shades
+
+def add_logo(ax, logo_url: str = None, position: str = 'lower right', zoom: float = 0.1, alpha: float = 1.0):
+    """
+    Add a logo/watermark to a matplotlib plot with automatic caching.
+
+    Downloads the logo once and caches it locally. Subsequent calls use the cached version.
+    Perfect for adding company logos or watermarks to all your plots.
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes to add the logo to
+        logo_url (str, optional): Direct URL to image file (PNG, JPG, etc.)
+            If None, uses a default placeholder
+        position (str): Position of logo. Options:
+            'lower right', 'lower left', 'upper right', 'upper left', 'center'
+        zoom (float): Size of logo (0.1 = 10% of original size)
+        alpha (float): Transparency (0.0 = invisible, 1.0 = opaque)
+
+    Returns:
+        matplotlib.axes.Axes: The axes with logo added
+
+    Example:
+        >>> fig, ax = plt.subplots()
+        >>> ax.plot(x, y)
+        >>> add_logo(ax, 'https://example.com/logo.png', 'lower right', zoom=0.15)
+        >>> plt.show()
+
+    Note:
+        - First call downloads and caches the image
+        - Subsequent calls are instant (uses cache)
+        - Cache location: system temp directory
+        - Works with PNG (transparency), JPG, GIF
+    """
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+    # Default logo URL (you can change this to your company logo)
+    if logo_url is None:
+        # Using a placeholder - replace with your actual logo URL
+        logo_url = "https://via.placeholder.com/150x50/F57600/FFFFFF?text=Logo"
+
+    # Cache directory
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_logos"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Generate cache filename from URL
+    logo_filename = logo_url.split('/')[-1].split('?')[0]
+    if not logo_filename:
+        logo_filename = "logo.png"
+    cache_path = cache_dir / logo_filename
+
+    # Download logo if not cached
+    if not cache_path.exists():
+        try:
+            print(f"📥 Downloading logo from {logo_url}...")
+            with urllib.request.urlopen(logo_url) as response:
+                if response.status != 200:
+                    raise FileNotFoundError(f"Failed to download logo. HTTP {response.status}")
+                with open(cache_path, 'wb') as f:
+                    f.write(response.read())
+            print(f"✅ Logo cached at {cache_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to download logo: {e}")
+            return ax
+
+    # Load logo image
+    try:
+        logo_img = plt.imread(str(cache_path))
+    except Exception as e:
+        print(f"⚠️  Failed to read logo image: {e}")
+        return ax
+
+    # Create image box
+    imagebox = OffsetImage(logo_img, zoom=zoom, alpha=alpha)
+
+    # Position mapping
+    positions = {
+        'lower right': (0.98, 0.02),
+        'lower left': (0.02, 0.02),
+        'upper right': (0.98, 0.98),
+        'upper left': (0.02, 0.98),
+        'center': (0.5, 0.5)
+    }
+
+    # Get position coordinates
+    if position in positions:
+        xy = positions[position]
+    else:
+        xy = positions['lower right']  # default
+
+    # Determine alignment
+    if 'right' in position:
+        box_alignment = (1, 0) if 'lower' in position else (1, 1)
+    elif 'left' in position:
+        box_alignment = (0, 0) if 'lower' in position else (0, 1)
+    else:  # center
+        box_alignment = (0.5, 0.5)
+
+    # Add logo to axes
+    ab = AnnotationBbox(
+        imagebox, xy,
+        xycoords='axes fraction',
+        frameon=False,
+        box_alignment=box_alignment
+    )
+    ax.add_artist(ab)
+
+    return ax
 
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
