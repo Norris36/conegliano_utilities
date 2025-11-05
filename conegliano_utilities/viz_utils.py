@@ -26,6 +26,12 @@ from matplotlib.lines import Line2D             # identify line-plots
 from matplotlib.patches import Rectangle, Wedge # identify bar / pie
 from matplotlib.collections import PathCollection
 
+# Suppress matplotlib font warnings (especially for XKCD mode)
+import warnings
+import logging
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+
 """
 visualising.py
 ==============
@@ -967,7 +973,7 @@ def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **lege
     return legend
 
 
-def xkcd(figsize=None, preset=None):
+def xkcd(figsize=None, preset=None, persistent=False):
     """
     Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
 
@@ -986,6 +992,11 @@ def xkcd(figsize=None, preset=None):
                           'poster', 'paper', 'default', etc.
         Example: preset='powerpoint_full'
 
+    persistent : bool, optional
+        If True, enables XKCD mode globally for all subsequent plots.
+        If False (default), only applies to the returned figure.
+        Example: persistent=True
+
     Returns
     -------
     fig : matplotlib.figure.Figure
@@ -1000,6 +1011,29 @@ def xkcd(figsize=None, preset=None):
     >>> fig, ax = xkcd()
     >>> ax.bar(['A', 'B', 'C'], [1, 2, 3])
     >>> plt.show()
+
+    Persistent mode for multiple plots and custom functions:
+
+    >>> # Enable XKCD globally - styling persists!
+    >>> fig, ax = xkcd(persistent=True)
+    >>> create_some_custom_plot(ax, data, colors)  # Custom function uses XKCD!
+    >>> plt.show()
+    >>>
+    >>> # Next plot also uses XKCD
+    >>> fig2, ax2 = setup_plot()
+    >>> ax2.plot(x, y)
+    >>> plt.show()
+    >>>
+    >>> # Turn off when done
+    >>> plt.rcdefaults()
+
+    Alternative: Manual persistent control:
+
+    >>> plt.xkcd()  # Turn on globally
+    >>> fig, ax = setup_plot(figsize=(12, 6))
+    >>> create_some_plot(ax, df, colors)  # XKCD styling persists!
+    >>> plt.show()
+    >>> plt.rcdefaults()  # Turn off
 
     With preset for PowerPoint:
 
@@ -1019,24 +1053,76 @@ def xkcd(figsize=None, preset=None):
     - Applies plt.xkcd() for hand-drawn comic look
     - Colors from your default palette are preserved
     - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - Font warnings are automatically suppressed
     - If you need direct access to colors, use simple_setup_plot() instead
+    - For custom plotting functions, use persistent=True or manual plt.xkcd()
 
     See Also
     --------
     setup_plot : Full-featured plot setup with all options
     simple_setup_plot : Lightweight setup that returns palette and shades
     apply_preset : Apply preset configurations
+    enable_xkcd_mode : Enable XKCD styling globally
+    disable_xkcd_mode : Disable XKCD styling
     """
     # Apply preset if requested
     if preset is not None:
         apply_preset(preset)
 
-    # Use XKCD context manager for comic styling
-    with plt.xkcd():
-        # Create figure with setup_plot to get corporate styling
+    if persistent:
+        # Enable XKCD mode globally
+        plt.xkcd()
         fig, ax = setup_plot(figsize=figsize)
+    else:
+        # Use XKCD context manager for this plot only
+        with plt.xkcd():
+            # Create figure with setup_plot to get corporate styling
+            fig, ax = setup_plot(figsize=figsize)
 
     return fig, ax
+
+
+def enable_xkcd_mode():
+    """
+    Enable XKCD comic-style rendering globally for all subsequent plots.
+
+    Call this once at the beginning of your notebook to apply XKCD styling to all plots.
+    Use disable_xkcd_mode() or plt.rcdefaults() to turn it off.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>>
+    >>> fig, ax = setup_plot()
+    >>> ax.plot(x, y)
+    >>>
+    >>> create_some_custom_plot(ax, df, colors)  # XKCD styling persists!
+    >>>
+    >>> disable_xkcd_mode()  # Turn off when done
+
+    See Also
+    --------
+    disable_xkcd_mode : Turn off XKCD styling
+    xkcd : Create single plot with XKCD styling
+    """
+    plt.xkcd()
+
+
+def disable_xkcd_mode():
+    """
+    Disable XKCD comic-style rendering and return to normal matplotlib styling.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>> # ... make XKCD plots ...
+    >>> disable_xkcd_mode()  # Back to normal
+
+    See Also
+    --------
+    enable_xkcd_mode : Turn on XKCD styling
+    """
+    plt.rcdefaults()
 
 
 def get_current_path():
