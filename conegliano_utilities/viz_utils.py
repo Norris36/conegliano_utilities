@@ -11,6 +11,9 @@ import numpy as np
 from tqdm import tqdm
 import difflib                               # fuzzy string matching (nice error msgs)
 import colorsys                              # HSL color space conversions
+import tempfile
+import urllib.request
+from urllib.error import URLError
 
 # THIRD-PARTY
 import matplotlib as mpl # main plotting lib
@@ -148,7 +151,27 @@ _GLOBAL_FONT_SIZE_BODY: int = STANDARD_FONTS['default']['body']
 _GLOBAL_FONT_SIZE_HEADER: int = STANDARD_FONTS['default']['header']
 
 # ────────────────────────────────────────────────────────────────
-# GETTERS - Retrieve current global settings
+# LOGO LIBRARY - Add more logos over time
+# ────────────────────────────────────────────────────────────────
+# Store commonly used company/brand logos for easy access
+# Add your own logos to this dictionary as you collect them
+
+LOGO_LIBRARY = {
+    # Default GN logo (replace with actual GN logo URL when available)
+    'gn': 'https://via.placeholder.com/150x50/F57600/FFFFFF?text=GN',  # Placeholder - replace with real GN logo
+
+    # Tech companies (example URLs - replace with actual logos)
+    'openai': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/200px-OpenAI_Logo.svg.png',
+    'microsoft': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Microsoft_logo.svg/200px-Microsoft_logo.svg.png',
+    'google': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/200px-Google_2015_logo.svg.png',
+    'aws': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/200px-Amazon_Web_Services_Logo.svg.png',
+
+    # Add more logos here as you collect them
+    # 'your_company': 'https://github.com/USER/REPO/raw/main/data/logo.png',
+}
+
+# ────────────────────────────────────────────────────────────────
+# LOGO FUNCTIONS
 # ────────────────────────────────────────────────────────────────
 
 def get_global_figsize() -> tuple[int, int]:
@@ -705,6 +728,316 @@ def simple_setup_plot(figsize: tuple[int, int] = None):
     ax.tick_params(colors=palette['Secondary'])
 
     return fig, ax, palette, generate_shades
+
+def add_logo(ax, logo: str = 'gn', position: str = 'lower right', zoom: float = 0.1, alpha: float = 1.0):
+    """
+    Add a logo/watermark to a matplotlib plot with automatic caching.
+
+    Downloads the logo once and caches it locally. Subsequent calls use the cached version.
+    Perfect for adding company logos or watermarks to all your plots.
+    **Defaults to GN logo** - just call add_logo(ax) with no parameters!
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes to add the logo to
+        logo (str): Logo name from LOGO_LIBRARY or direct URL
+            - Use name: 'gn', 'openai', 'microsoft', 'google', 'aws'
+            - Or direct URL: 'https://example.com/logo.png'
+            - Or local path: '/path/to/logo.png'
+            - Default: 'gn' (GN logo)
+        position (str): Position of logo. Options:
+            'lower right', 'lower left', 'upper right', 'upper left', 'center'
+        zoom (float): Size of logo (0.1 = 10% of original size)
+        alpha (float): Transparency (0.0 = invisible, 1.0 = opaque)
+
+    Returns:
+        matplotlib.axes.Axes: The axes with logo added
+
+    Example:
+        >>> # Use default GN logo
+        >>> fig, ax = plt.subplots()
+        >>> ax.plot(x, y)
+        >>> add_logo(ax)  # Uses GN logo by default!
+
+        >>> # Use logo from library
+        >>> add_logo(ax, 'microsoft', zoom=0.12)
+
+        >>> # Use custom URL
+        >>> add_logo(ax, 'https://your-logo.png', 'upper right')
+
+    Note:
+        - Default is 'gn' logo - just call add_logo(ax)
+        - Supports logo names from LOGO_LIBRARY
+        - First call downloads and caches the image
+        - Subsequent calls are instant (uses cache)
+        - Cache location: system temp directory
+        - Works with PNG (transparency), JPG, GIF
+        - Add more logos to LOGO_LIBRARY dictionary
+    """
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+    # Check if logo is a name in the library or a direct URL
+    if logo in LOGO_LIBRARY:
+        logo_url = LOGO_LIBRARY[logo]
+    else:
+        # Assume it's a direct URL or file path
+        logo_url = logo
+
+    # Cache directory
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_logos"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Generate cache filename from URL
+    logo_filename = logo_url.split('/')[-1].split('?')[0]
+    if not logo_filename:
+        logo_filename = "logo.png"
+    cache_path = cache_dir / logo_filename
+
+    # Download logo if not cached
+    if not cache_path.exists():
+        try:
+            print(f"📥 Downloading logo from {logo_url}...")
+            with urllib.request.urlopen(logo_url) as response:
+                if response.status != 200:
+                    raise FileNotFoundError(f"Failed to download logo. HTTP {response.status}")
+                with open(cache_path, 'wb') as f:
+                    f.write(response.read())
+            print(f"✅ Logo cached at {cache_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to download logo: {e}")
+            return ax
+
+    # Load logo image
+    try:
+        logo_img = plt.imread(str(cache_path))
+    except Exception as e:
+        print(f"⚠️  Failed to read logo image: {e}")
+        return ax
+
+    # Create image box
+    imagebox = OffsetImage(logo_img, zoom=zoom, alpha=alpha)
+
+    # Position mapping
+    positions = {
+        'lower right': (0.98, 0.02),
+        'lower left': (0.02, 0.02),
+        'upper right': (0.98, 0.98),
+        'upper left': (0.02, 0.98),
+        'center': (0.5, 0.5)
+    }
+
+    # Get position coordinates
+    if position in positions:
+        xy = positions[position]
+    else:
+        xy = positions['lower right']  # default
+
+    # Determine alignment
+    if 'right' in position:
+        box_alignment = (1, 0) if 'lower' in position else (1, 1)
+    elif 'left' in position:
+        box_alignment = (0, 0) if 'lower' in position else (0, 1)
+    else:  # center
+        box_alignment = (0.5, 0.5)
+
+    # Add logo to axes
+    ab = AnnotationBbox(
+        imagebox, xy,
+        xycoords='axes fraction',
+        frameon=False,
+        box_alignment=box_alignment
+    )
+    ax.add_artist(ab)
+
+    return ax
+
+def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **legend_kwargs):
+    """
+    Add company logos to legend entries for comparison charts.
+
+    Perfect for charts comparing OpenAI, Microsoft, AWS, Google, etc.
+    Each legend entry shows: [LOGO] Company Name ━━━ (line/marker)
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes with plotted data
+        company_logos (dict): Mapping of company names to logo identifiers
+            Keys: Company names (must match label in plot)
+            Values: Logo name from LOGO_LIBRARY or direct URL
+            Example: {'OpenAI': 'openai', 'Microsoft': 'microsoft'}
+        logo_size (float): Size of logos in legend (0.05 = small, 0.1 = medium)
+        **legend_kwargs: Additional arguments passed to ax.legend()
+
+    Returns:
+        matplotlib.legend.Legend: The legend with logos
+
+    Example:
+        >>> # Plot multiple companies
+        >>> fig, ax = plt.subplots()
+        >>> ax.plot(x, openai_data, label='OpenAI', linewidth=2)
+        >>> ax.plot(x, microsoft_data, label='Microsoft', linewidth=2)
+        >>> ax.plot(x, google_data, label='Google', linewidth=2)
+        >>>
+        >>> # Add logos to legend
+        >>> company_logos = {
+        >>>     'OpenAI': 'openai',
+        >>>     'Microsoft': 'microsoft',
+        >>>     'Google': 'google'
+        >>> }
+        >>> add_logos_to_legend(ax, company_logos)
+        >>> plt.show()
+
+    Note:
+        - Company names in dict must EXACTLY match plot labels
+        - Logos are automatically downloaded and cached
+        - Works with logo names or direct URLs
+        - Looks amazing for competitor comparisons!
+    """
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    from matplotlib.legend_handler import HandlerBase
+
+    # Custom legend handler that adds logos
+    class HandlerWithLogo(HandlerBase):
+        def __init__(self, logo_path, logo_size):
+            self.logo_path = logo_path
+            self.logo_size = logo_size
+            super().__init__()
+
+        def create_artists(self, legend, orig_handle, xdescent, ydescent,
+                          width, height, fontsize, trans):
+            # Get the logo image
+            try:
+                logo_img = plt.imread(self.logo_path)
+
+                # Create logo image box
+                imagebox = OffsetImage(logo_img, zoom=self.logo_size)
+
+                # Position logo at the start of the legend entry
+                ab = AnnotationBbox(imagebox, (xdescent + width/2, height/2),
+                                   xycoords=trans,
+                                   frameon=False,
+                                   box_alignment=(0.5, 0.5))
+
+                return [ab]
+            except:
+                # If logo fails, return empty
+                return []
+
+    # Download and cache all logos first
+    logo_paths = {}
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_logos"
+    cache_dir.mkdir(exist_ok=True)
+
+    for company, logo_id in company_logos.items():
+        # Get logo URL from library or use as-is
+        if logo_id in LOGO_LIBRARY:
+            logo_url = LOGO_LIBRARY[logo_id]
+        else:
+            logo_url = logo_id
+
+        # Generate cache filename
+        logo_filename = f"{company.lower().replace(' ', '_')}_logo.png"
+        cache_path = cache_dir / logo_filename
+
+        # Download if not cached
+        if not cache_path.exists():
+            try:
+                with urllib.request.urlopen(logo_url) as response:
+                    if response.status == 200:
+                        with open(cache_path, 'wb') as f:
+                            f.write(response.read())
+            except:
+                pass  # Skip if download fails
+
+        if cache_path.exists():
+            logo_paths[company] = str(cache_path)
+
+    # Get existing legend labels and handles
+    handles, labels = ax.get_legend_handles_labels()
+
+    # Create handler map for logos
+    handler_map = {}
+    for handle, label in zip(handles, labels):
+        if label in logo_paths:
+            handler_map[handle] = HandlerWithLogo(logo_paths[label], logo_size)
+
+    # Create legend with custom handlers
+    legend = ax.legend(handles=handles, labels=labels,
+                      handler_map=handler_map if handler_map else None,
+                      **legend_kwargs)
+
+    return legend
+
+
+def xkcd(figsize=None, preset=None):
+    """
+    Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
+
+    This is the simplest way to create XKCD-style plots with your corporate colors and fonts.
+    Just call xkcd() and start plotting!
+
+    Parameters
+    ----------
+    figsize : tuple of float, optional
+        Figure dimensions (width, height) in inches. If None, uses global defaults.
+        Example: figsize=(10, 6)
+
+    preset : str, optional
+        Apply a standard preset configuration before creating the plot.
+        Available presets: 'powerpoint_full', 'powerpoint_center', 'powerpoint_half',
+                          'poster', 'paper', 'default', etc.
+        Example: preset='powerpoint_full'
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object with XKCD styling applied
+    ax : matplotlib.axes.Axes
+        The axes object ready for plotting
+
+    Examples
+    --------
+    Basic usage (super simple!):
+
+    >>> fig, ax = xkcd()
+    >>> ax.bar(['A', 'B', 'C'], [1, 2, 3])
+    >>> plt.show()
+
+    With preset for PowerPoint:
+
+    >>> fig, ax = xkcd(preset='powerpoint_full')
+    >>> ax.plot(x, y)
+    >>> plt.show()
+
+    Custom figure size:
+
+    >>> fig, ax = xkcd(figsize=(10, 6))
+    >>> ax.scatter(x, y)
+    >>> plt.show()
+
+    Notes
+    -----
+    - Uses setup_plot() internally, so you get all the corporate styling
+    - Applies plt.xkcd() for hand-drawn comic look
+    - Colors from your default palette are preserved
+    - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - If you need direct access to colors, use simple_setup_plot() instead
+
+    See Also
+    --------
+    setup_plot : Full-featured plot setup with all options
+    simple_setup_plot : Lightweight setup that returns palette and shades
+    apply_preset : Apply preset configurations
+    """
+    # Apply preset if requested
+    if preset is not None:
+        apply_preset(preset)
+
+    # Use XKCD context manager for comic styling
+    with plt.xkcd():
+        # Create figure with setup_plot to get corporate styling
+        fig, ax = setup_plot(figsize=figsize)
+
+    return fig, ax
+
 
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
