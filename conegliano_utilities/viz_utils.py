@@ -973,6 +973,64 @@ def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **lege
     return legend
 
 
+def _download_and_cache_xkcd_font():
+    """
+    Download and cache the XKCD font, then register it with matplotlib.
+
+    This function downloads the official XKCD font from GitHub on first use,
+    caches it locally (like logos), and registers it with matplotlib's font manager.
+    Subsequent calls use the cached version.
+
+    Returns
+    -------
+    bool
+        True if font is available (cached or newly downloaded), False if download failed.
+
+    Notes
+    -----
+    - Font is cached in system temp directory (persists across sessions)
+    - Download happens only once, then cached forever
+    - Silently uses cached font if already downloaded
+    - Suppresses font warnings automatically
+    """
+    # Font URL (official XKCD font from ipython/xkcd-font repo)
+    font_url = "https://github.com/ipython/xkcd-font/raw/master/xkcd-script/font/xkcd-script.ttf"
+
+    # Cache directory (same pattern as logos)
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_fonts"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Cache path
+    font_cache_path = cache_dir / "xkcd-script.ttf"
+
+    # Download font if not cached
+    if not font_cache_path.exists():
+        try:
+            # Silent download (no print statements for clean output)
+            with urllib.request.urlopen(font_url) as response:
+                if response.status != 200:
+                    return False  # Failed to download, continue without font
+                with open(font_cache_path, 'wb') as f:
+                    f.write(response.read())
+        except Exception:
+            # Silent failure - XKCD will use fallback fonts
+            return False
+
+    # Register font with matplotlib (if not already registered)
+    try:
+        # Check if font is already registered
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
+        if 'xkcd Script' not in available_fonts:
+            fm.fontManager.addfont(str(font_cache_path))
+            # Rebuild font cache
+            fm._load_fontmanager(try_read_cache=False)
+    except Exception:
+        # Silent failure - will use fallback fonts
+        return False
+
+    return True
+
+
 def xkcd(figsize=None, preset=None, persistent=False):
     """
     Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
@@ -1053,6 +1111,7 @@ def xkcd(figsize=None, preset=None, persistent=False):
     - Applies plt.xkcd() for hand-drawn comic look
     - Colors from your default palette are preserved
     - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - **XKCD font automatically downloaded and cached** (like logos - first use only!)
     - Font warnings are automatically suppressed
     - If you need direct access to colors, use simple_setup_plot() instead
     - For custom plotting functions, use persistent=True or manual plt.xkcd()
@@ -1065,6 +1124,9 @@ def xkcd(figsize=None, preset=None, persistent=False):
     enable_xkcd_mode : Enable XKCD styling globally
     disable_xkcd_mode : Disable XKCD styling
     """
+    # Download and cache XKCD font (first time only, then cached forever like logos)
+    _download_and_cache_xkcd_font()
+
     # Apply preset if requested
     if preset is not None:
         apply_preset(preset)
@@ -1105,6 +1167,9 @@ def enable_xkcd_mode():
     disable_xkcd_mode : Turn off XKCD styling
     xkcd : Create single plot with XKCD styling
     """
+    # Download and cache XKCD font if needed
+    _download_and_cache_xkcd_font()
+
     plt.xkcd()
 
 
