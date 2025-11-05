@@ -966,6 +966,79 @@ def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **lege
 
     return legend
 
+
+def xkcd(figsize=None, preset=None):
+    """
+    Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
+
+    This is the simplest way to create XKCD-style plots with your corporate colors and fonts.
+    Just call xkcd() and start plotting!
+
+    Parameters
+    ----------
+    figsize : tuple of float, optional
+        Figure dimensions (width, height) in inches. If None, uses global defaults.
+        Example: figsize=(10, 6)
+
+    preset : str, optional
+        Apply a standard preset configuration before creating the plot.
+        Available presets: 'powerpoint_full', 'powerpoint_center', 'powerpoint_half',
+                          'poster', 'paper', 'default', etc.
+        Example: preset='powerpoint_full'
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object with XKCD styling applied
+    ax : matplotlib.axes.Axes
+        The axes object ready for plotting
+
+    Examples
+    --------
+    Basic usage (super simple!):
+
+    >>> fig, ax = xkcd()
+    >>> ax.bar(['A', 'B', 'C'], [1, 2, 3])
+    >>> plt.show()
+
+    With preset for PowerPoint:
+
+    >>> fig, ax = xkcd(preset='powerpoint_full')
+    >>> ax.plot(x, y)
+    >>> plt.show()
+
+    Custom figure size:
+
+    >>> fig, ax = xkcd(figsize=(10, 6))
+    >>> ax.scatter(x, y)
+    >>> plt.show()
+
+    Notes
+    -----
+    - Uses setup_plot() internally, so you get all the corporate styling
+    - Applies plt.xkcd() for hand-drawn comic look
+    - Colors from your default palette are preserved
+    - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - If you need direct access to colors, use simple_setup_plot() instead
+
+    See Also
+    --------
+    setup_plot : Full-featured plot setup with all options
+    simple_setup_plot : Lightweight setup that returns palette and shades
+    apply_preset : Apply preset configurations
+    """
+    # Apply preset if requested
+    if preset is not None:
+        apply_preset(preset)
+
+    # Use XKCD context manager for comic styling
+    with plt.xkcd():
+        # Create figure with setup_plot to get corporate styling
+        fig, ax = setup_plot(figsize=figsize)
+
+    return fig, ax
+
+
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
     return str(pathlib.Path().absolute())
