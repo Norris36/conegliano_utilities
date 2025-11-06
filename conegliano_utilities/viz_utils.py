@@ -155,6 +155,7 @@ STANDARD_FONTS = {
 _GLOBAL_FIGSIZE: tuple[int, int] = STANDARD_FIGSIZES['default']
 _GLOBAL_FONT_SIZE_BODY: int = STANDARD_FONTS['default']['body']
 _GLOBAL_FONT_SIZE_HEADER: int = STANDARD_FONTS['default']['header']
+_GLOBAL_DEFAULT_PALETTE: str = 'default'  # Default color palette name
 
 # ────────────────────────────────────────────────────────────────
 # LOGO LIBRARY - Add more logos over time
@@ -251,9 +252,41 @@ def set_global_font_size_header(size: int) -> None:
     global _GLOBAL_FONT_SIZE_HEADER
     _GLOBAL_FONT_SIZE_HEADER = size
 
+def set_global_default_palette(palette_name: str) -> None:
+    """
+    Set the global default color palette for all future plots.
+
+    Args:
+        palette_name (str): Name of the palette to use as default.
+            Available: 'default', 'dark mode', 'alternative', 'greyscale',
+                      'steelseries_1', 'steelseries_darkmode', 'steelseries_alternative'
+
+    Example:
+        >>> set_global_default_palette('dark mode')  # All plots now dark mode
+        >>> set_global_default_palette('steelseries_1')  # Steelseries colors
+    """
+    global _GLOBAL_DEFAULT_PALETTE
+    # Validate palette exists
+    colors = get_color_palette(palette_name)  # Will error if invalid
+    _GLOBAL_DEFAULT_PALETTE = palette_name
+
+def get_global_default_palette() -> str:
+    """
+    Get the current global default color palette name.
+
+    Returns:
+        str: Current default palette name.
+
+    Example:
+        >>> get_global_default_palette()
+        'default'
+    """
+    return _GLOBAL_DEFAULT_PALETTE
+
 def set_global_plot_defaults(figsize: tuple[int, int] = None,
                              font_size_body: int = None,
-                             font_size_header: int = None) -> None:
+                             font_size_header: int = None,
+                             default_palette: str = None) -> None:
     """
     Convenience function to set multiple global plot defaults at once.
 
@@ -261,11 +294,14 @@ def set_global_plot_defaults(figsize: tuple[int, int] = None,
         figsize (tuple[int, int], optional): Figure size as (width, height).
         font_size_body (int, optional): Body font size in points.
         font_size_header (int, optional): Header font size in points.
+        default_palette (str, optional): Default color palette name.
 
     Example:
         >>> set_global_plot_defaults(figsize=(16, 10), font_size_body=14, font_size_header=18)
         >>> # OR set just one parameter
         >>> set_global_plot_defaults(font_size_body=16)
+        >>> # OR include palette
+        >>> set_global_plot_defaults(figsize=(12, 6), default_palette='dark mode')
     """
     if figsize is not None:
         set_global_figsize(figsize[0], figsize[1])
@@ -273,23 +309,26 @@ def set_global_plot_defaults(figsize: tuple[int, int] = None,
         set_global_font_size_body(font_size_body)
     if font_size_header is not None:
         set_global_font_size_header(font_size_header)
+    if default_palette is not None:
+        set_global_default_palette(default_palette)
 
 def get_global_plot_defaults() -> dict:
     """
     Get all current global plot defaults as a dictionary.
 
     Returns:
-        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header'.
+        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header', 'default_palette'.
 
     Example:
         >>> defaults = get_global_plot_defaults()
         >>> print(defaults)
-        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16}
+        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16, 'default_palette': 'default'}
     """
     return {
         'figsize': _GLOBAL_FIGSIZE,
         'font_size_body': _GLOBAL_FONT_SIZE_BODY,
-        'font_size_header': _GLOBAL_FONT_SIZE_HEADER
+        'font_size_header': _GLOBAL_FONT_SIZE_HEADER,
+        'default_palette': _GLOBAL_DEFAULT_PALETTE
     }
 
 # ────────────────────────────────────────────────────────────────
@@ -641,7 +680,7 @@ def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     # -------- figure-wide font ----------------------------------
     plt.rcParams["font.family"] = font_properties.get_name()
 
-def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
+def setup_plot(*, color: str = None, figsize: tuple[int, int] = None):
     """
     One-line description
         Create a single (fig, ax) pair pre-styled with the company theme.
@@ -656,8 +695,9 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
 
     Args
     ----
-    color   : str
+    color   : str, optional
         Palette name.  Case-insensitive, minor typos allowed.
+        If None, uses the global default palette set by set_global_default_palette().
     figsize : tuple[int, int], optional
         Size in inches, forwarded to `plt.subplots`.
         If None, uses the global default set by set_global_figsize().
@@ -668,10 +708,13 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
         The newly created figure & axes ready for plotting.
     """
     # ------------------------------------------------------------
-    # 1. Use global figsize if not specified
+    # 1. Use global defaults if not specified
     # ------------------------------------------------------------
     if figsize is None:
         figsize = _GLOBAL_FIGSIZE
+
+    if color is None:
+        color = _GLOBAL_DEFAULT_PALETTE
 
     # ------------------------------------------------------------
     # 2. Retrieve colour palette (handles user typos)
