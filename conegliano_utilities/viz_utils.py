@@ -26,6 +26,12 @@ from matplotlib.lines import Line2D             # identify line-plots
 from matplotlib.patches import Rectangle, Wedge # identify bar / pie
 from matplotlib.collections import PathCollection
 
+# Suppress matplotlib font warnings (especially for XKCD mode)
+import warnings
+import logging
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+
 """
 visualising.py
 ==============
@@ -149,6 +155,7 @@ STANDARD_FONTS = {
 _GLOBAL_FIGSIZE: tuple[int, int] = STANDARD_FIGSIZES['default']
 _GLOBAL_FONT_SIZE_BODY: int = STANDARD_FONTS['default']['body']
 _GLOBAL_FONT_SIZE_HEADER: int = STANDARD_FONTS['default']['header']
+_GLOBAL_DEFAULT_PALETTE: str = 'default'  # Default color palette name
 
 # ────────────────────────────────────────────────────────────────
 # LOGO LIBRARY - Add more logos over time
@@ -245,9 +252,41 @@ def set_global_font_size_header(size: int) -> None:
     global _GLOBAL_FONT_SIZE_HEADER
     _GLOBAL_FONT_SIZE_HEADER = size
 
+def set_global_default_palette(palette_name: str) -> None:
+    """
+    Set the global default color palette for all future plots.
+
+    Args:
+        palette_name (str): Name of the palette to use as default.
+            Available: 'default', 'dark mode', 'alternative', 'greyscale',
+                      'steelseries_1', 'steelseries_darkmode', 'steelseries_alternative'
+
+    Example:
+        >>> set_global_default_palette('dark mode')  # All plots now dark mode
+        >>> set_global_default_palette('steelseries_1')  # Steelseries colors
+    """
+    global _GLOBAL_DEFAULT_PALETTE
+    # Validate palette exists
+    colors = get_color_palette(palette_name)  # Will error if invalid
+    _GLOBAL_DEFAULT_PALETTE = palette_name
+
+def get_global_default_palette() -> str:
+    """
+    Get the current global default color palette name.
+
+    Returns:
+        str: Current default palette name.
+
+    Example:
+        >>> get_global_default_palette()
+        'default'
+    """
+    return _GLOBAL_DEFAULT_PALETTE
+
 def set_global_plot_defaults(figsize: tuple[int, int] = None,
                              font_size_body: int = None,
-                             font_size_header: int = None) -> None:
+                             font_size_header: int = None,
+                             default_palette: str = None) -> None:
     """
     Convenience function to set multiple global plot defaults at once.
 
@@ -255,11 +294,14 @@ def set_global_plot_defaults(figsize: tuple[int, int] = None,
         figsize (tuple[int, int], optional): Figure size as (width, height).
         font_size_body (int, optional): Body font size in points.
         font_size_header (int, optional): Header font size in points.
+        default_palette (str, optional): Default color palette name.
 
     Example:
         >>> set_global_plot_defaults(figsize=(16, 10), font_size_body=14, font_size_header=18)
         >>> # OR set just one parameter
         >>> set_global_plot_defaults(font_size_body=16)
+        >>> # OR include palette
+        >>> set_global_plot_defaults(figsize=(12, 6), default_palette='dark mode')
     """
     if figsize is not None:
         set_global_figsize(figsize[0], figsize[1])
@@ -267,23 +309,26 @@ def set_global_plot_defaults(figsize: tuple[int, int] = None,
         set_global_font_size_body(font_size_body)
     if font_size_header is not None:
         set_global_font_size_header(font_size_header)
+    if default_palette is not None:
+        set_global_default_palette(default_palette)
 
 def get_global_plot_defaults() -> dict:
     """
     Get all current global plot defaults as a dictionary.
 
     Returns:
-        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header'.
+        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header', 'default_palette'.
 
     Example:
         >>> defaults = get_global_plot_defaults()
         >>> print(defaults)
-        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16}
+        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16, 'default_palette': 'default'}
     """
     return {
         'figsize': _GLOBAL_FIGSIZE,
         'font_size_body': _GLOBAL_FONT_SIZE_BODY,
-        'font_size_header': _GLOBAL_FONT_SIZE_HEADER
+        'font_size_header': _GLOBAL_FONT_SIZE_HEADER,
+        'default_palette': _GLOBAL_DEFAULT_PALETTE
     }
 
 # ────────────────────────────────────────────────────────────────
@@ -635,7 +680,7 @@ def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     # -------- figure-wide font ----------------------------------
     plt.rcParams["font.family"] = font_properties.get_name()
 
-def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
+def setup_plot(*, color: str = None, figsize: tuple[int, int] = None):
     """
     One-line description
         Create a single (fig, ax) pair pre-styled with the company theme.
@@ -650,8 +695,9 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
 
     Args
     ----
-    color   : str
+    color   : str, optional
         Palette name.  Case-insensitive, minor typos allowed.
+        If None, uses the global default palette set by set_global_default_palette().
     figsize : tuple[int, int], optional
         Size in inches, forwarded to `plt.subplots`.
         If None, uses the global default set by set_global_figsize().
@@ -662,10 +708,13 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = None):
         The newly created figure & axes ready for plotting.
     """
     # ------------------------------------------------------------
-    # 1. Use global figsize if not specified
+    # 1. Use global defaults if not specified
     # ------------------------------------------------------------
     if figsize is None:
         figsize = _GLOBAL_FIGSIZE
+
+    if color is None:
+        color = _GLOBAL_DEFAULT_PALETTE
 
     # ------------------------------------------------------------
     # 2. Retrieve colour palette (handles user typos)
@@ -967,7 +1016,65 @@ def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **lege
     return legend
 
 
-def xkcd(figsize=None, preset=None):
+def _download_and_cache_xkcd_font():
+    """
+    Download and cache the XKCD font, then register it with matplotlib.
+
+    This function downloads the official XKCD font from GitHub on first use,
+    caches it locally (like logos), and registers it with matplotlib's font manager.
+    Subsequent calls use the cached version.
+
+    Returns
+    -------
+    bool
+        True if font is available (cached or newly downloaded), False if download failed.
+
+    Notes
+    -----
+    - Font is cached in system temp directory (persists across sessions)
+    - Download happens only once, then cached forever
+    - Silently uses cached font if already downloaded
+    - Suppresses font warnings automatically
+    """
+    # Font URL (official XKCD font from ipython/xkcd-font repo)
+    font_url = "https://github.com/ipython/xkcd-font/raw/master/xkcd-script/font/xkcd-script.ttf"
+
+    # Cache directory (same pattern as logos)
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_fonts"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Cache path
+    font_cache_path = cache_dir / "xkcd-script.ttf"
+
+    # Download font if not cached
+    if not font_cache_path.exists():
+        try:
+            # Silent download (no print statements for clean output)
+            with urllib.request.urlopen(font_url) as response:
+                if response.status != 200:
+                    return False  # Failed to download, continue without font
+                with open(font_cache_path, 'wb') as f:
+                    f.write(response.read())
+        except Exception:
+            # Silent failure - XKCD will use fallback fonts
+            return False
+
+    # Register font with matplotlib (if not already registered)
+    try:
+        # Check if font is already registered
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
+        if 'xkcd Script' not in available_fonts:
+            fm.fontManager.addfont(str(font_cache_path))
+            # Rebuild font cache
+            fm._load_fontmanager(try_read_cache=False)
+    except Exception:
+        # Silent failure - will use fallback fonts
+        return False
+
+    return True
+
+
+def xkcd(figsize=None, preset=None, persistent=False):
     """
     Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
 
@@ -986,6 +1093,11 @@ def xkcd(figsize=None, preset=None):
                           'poster', 'paper', 'default', etc.
         Example: preset='powerpoint_full'
 
+    persistent : bool, optional
+        If True, enables XKCD mode globally for all subsequent plots.
+        If False (default), only applies to the returned figure.
+        Example: persistent=True
+
     Returns
     -------
     fig : matplotlib.figure.Figure
@@ -1000,6 +1112,29 @@ def xkcd(figsize=None, preset=None):
     >>> fig, ax = xkcd()
     >>> ax.bar(['A', 'B', 'C'], [1, 2, 3])
     >>> plt.show()
+
+    Persistent mode for multiple plots and custom functions:
+
+    >>> # Enable XKCD globally - styling persists!
+    >>> fig, ax = xkcd(persistent=True)
+    >>> create_some_custom_plot(ax, data, colors)  # Custom function uses XKCD!
+    >>> plt.show()
+    >>>
+    >>> # Next plot also uses XKCD
+    >>> fig2, ax2 = setup_plot()
+    >>> ax2.plot(x, y)
+    >>> plt.show()
+    >>>
+    >>> # Turn off when done
+    >>> plt.rcdefaults()
+
+    Alternative: Manual persistent control:
+
+    >>> plt.xkcd()  # Turn on globally
+    >>> fig, ax = setup_plot(figsize=(12, 6))
+    >>> create_some_plot(ax, df, colors)  # XKCD styling persists!
+    >>> plt.show()
+    >>> plt.rcdefaults()  # Turn off
 
     With preset for PowerPoint:
 
@@ -1019,24 +1154,83 @@ def xkcd(figsize=None, preset=None):
     - Applies plt.xkcd() for hand-drawn comic look
     - Colors from your default palette are preserved
     - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - **XKCD font automatically downloaded and cached** (like logos - first use only!)
+    - Font warnings are automatically suppressed
     - If you need direct access to colors, use simple_setup_plot() instead
+    - For custom plotting functions, use persistent=True or manual plt.xkcd()
 
     See Also
     --------
     setup_plot : Full-featured plot setup with all options
     simple_setup_plot : Lightweight setup that returns palette and shades
     apply_preset : Apply preset configurations
+    enable_xkcd_mode : Enable XKCD styling globally
+    disable_xkcd_mode : Disable XKCD styling
     """
+    # Download and cache XKCD font (first time only, then cached forever like logos)
+    _download_and_cache_xkcd_font()
+
     # Apply preset if requested
     if preset is not None:
         apply_preset(preset)
 
-    # Use XKCD context manager for comic styling
-    with plt.xkcd():
-        # Create figure with setup_plot to get corporate styling
+    if persistent:
+        # Enable XKCD mode globally
+        plt.xkcd()
         fig, ax = setup_plot(figsize=figsize)
+    else:
+        # Use XKCD context manager for this plot only
+        with plt.xkcd():
+            # Create figure with setup_plot to get corporate styling
+            fig, ax = setup_plot(figsize=figsize)
 
     return fig, ax
+
+
+def enable_xkcd_mode():
+    """
+    Enable XKCD comic-style rendering globally for all subsequent plots.
+
+    Call this once at the beginning of your notebook to apply XKCD styling to all plots.
+    Use disable_xkcd_mode() or plt.rcdefaults() to turn it off.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>>
+    >>> fig, ax = setup_plot()
+    >>> ax.plot(x, y)
+    >>>
+    >>> create_some_custom_plot(ax, df, colors)  # XKCD styling persists!
+    >>>
+    >>> disable_xkcd_mode()  # Turn off when done
+
+    See Also
+    --------
+    disable_xkcd_mode : Turn off XKCD styling
+    xkcd : Create single plot with XKCD styling
+    """
+    # Download and cache XKCD font if needed
+    _download_and_cache_xkcd_font()
+
+    plt.xkcd()
+
+
+def disable_xkcd_mode():
+    """
+    Disable XKCD comic-style rendering and return to normal matplotlib styling.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>> # ... make XKCD plots ...
+    >>> disable_xkcd_mode()  # Back to normal
+
+    See Also
+    --------
+    enable_xkcd_mode : Turn on XKCD styling
+    """
+    plt.rcdefaults()
 
 
 def get_current_path():
