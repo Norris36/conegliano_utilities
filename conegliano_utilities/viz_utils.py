@@ -164,8 +164,8 @@ _GLOBAL_DEFAULT_PALETTE: str = 'default'  # Default color palette name
 # Add your own logos to this dictionary as you collect them
 
 LOGO_LIBRARY = {
-    # Default GN logo (replace with actual GN logo URL when available)
-    'gn': 'https://via.placeholder.com/150x50/F57600/FFFFFF?text=GN',  # Placeholder - replace with real GN logo
+    # GN Store Nord official logo
+    'gn': 'https://www.pinpng.com/pngs/m/144-1445658_gn-store-nord-logo-hd-png-download.png',
 
     # Tech companies (example URLs - replace with actual logos)
     'openai': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/200px-OpenAI_Logo.svg.png',
