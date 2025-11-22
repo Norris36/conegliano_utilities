@@ -10,6 +10,10 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import difflib                               # fuzzy string matching (nice error msgs)
+import colorsys                              # HSL color space conversions
+import tempfile
+import urllib.request
+from urllib.error import URLError
 
 # THIRD-PARTY
 import matplotlib as mpl # main plotting lib
@@ -21,6 +25,12 @@ from matplotlib.axes import Axes                # explicit type hints
 from matplotlib.lines import Line2D             # identify line-plots
 from matplotlib.patches import Rectangle, Wedge # identify bar / pie
 from matplotlib.collections import PathCollection
+
+# Suppress matplotlib font warnings (especially for XKCD mode)
+import warnings
+import logging
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
 """
 visualising.py
@@ -107,6 +117,336 @@ _PALETTES: dict[str, dict[str, str]] = {
     }
 }
 
+# ────────────────────────────────────────────────────────────────
+# 2. STANDARD PRESETS FOR FIGURE SIZES AND FONTS
+# ────────────────────────────────────────────────────────────────
+# Predefined configurations optimized for different output formats.
+# PowerPoint dimensions are in inches and match standard slide sizes.
+
+STANDARD_FIGSIZES = {
+    'powerpoint_full': (33.83, 19.05),      # Full PowerPoint slide (16:9)
+    'powerpoint_center': (31.56, 13.36),    # Center content area
+    'powerpoint_half': (15.49, 12.93),      # Half slide (side-by-side)
+    'default': (12, 6),                     # Standard notebook size
+    'small': (8, 6),                        # Compact display
+    'large': (16, 10),                      # Large display
+    'square': (10, 10),                     # Square format
+    'wide': (16, 6),                        # Wide format
+    'poster': (24, 36),                     # Academic poster
+}
+
+STANDARD_FONTS = {
+    'powerpoint_full': {'header': 45, 'body': 35},
+    'powerpoint_center': {'header': 40, 'body': 30},
+    'powerpoint_half': {'header': 32, 'body': 24},
+    'default': {'header': 16, 'body': 12},
+    'small': {'header': 14, 'body': 10},
+    'large': {'header': 20, 'body': 16},
+    'poster': {'header': 72, 'body': 48},
+}
+
+# ────────────────────────────────────────────────────────────────
+# 3. GLOBAL DEFAULTS FOR FIGURE SIZE AND FONTS
+# ────────────────────────────────────────────────────────────────
+# These global variables control the default size and font settings
+# for all plots created with setup_plot() and setup_subplots().
+# Use the getter/setter functions below to customize these values.
+
+_GLOBAL_FIGSIZE: tuple[int, int] = STANDARD_FIGSIZES['default']
+_GLOBAL_FONT_SIZE_BODY: int = STANDARD_FONTS['default']['body']
+_GLOBAL_FONT_SIZE_HEADER: int = STANDARD_FONTS['default']['header']
+_GLOBAL_DEFAULT_PALETTE: str = 'default'  # Default color palette name
+
+# ────────────────────────────────────────────────────────────────
+# LOGO LIBRARY - Add more logos over time
+# ────────────────────────────────────────────────────────────────
+# Store commonly used company/brand logos for easy access
+# Add your own logos to this dictionary as you collect them
+
+LOGO_LIBRARY = {
+    # Default GN logo (replace with actual GN logo URL when available)
+    'gn': 'https://via.placeholder.com/150x50/F57600/FFFFFF?text=GN',  # Placeholder - replace with real GN logo
+
+    # Tech companies (example URLs - replace with actual logos)
+    'openai': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/200px-OpenAI_Logo.svg.png',
+    'microsoft': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Microsoft_logo.svg/200px-Microsoft_logo.svg.png',
+    'google': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/200px-Google_2015_logo.svg.png',
+    'aws': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/200px-Amazon_Web_Services_Logo.svg.png',
+
+    # Add more logos here as you collect them
+    # 'your_company': 'https://github.com/USER/REPO/raw/main/data/logo.png',
+}
+
+# ────────────────────────────────────────────────────────────────
+# LOGO FUNCTIONS
+# ────────────────────────────────────────────────────────────────
+
+def get_global_figsize() -> tuple[int, int]:
+    """
+    Get the current global default figure size.
+
+    Returns:
+        tuple[int, int]: Figure size as (width, height) in inches.
+    """
+    return _GLOBAL_FIGSIZE
+
+def get_global_font_size_body() -> int:
+    """
+    Get the current global default body font size.
+
+    Returns:
+        int: Font size in points for body text (labels, ticks, annotations).
+    """
+    return _GLOBAL_FONT_SIZE_BODY
+
+def get_global_font_size_header() -> int:
+    """
+    Get the current global default header font size.
+
+    Returns:
+        int: Font size in points for headers (titles, legend titles).
+    """
+    return _GLOBAL_FONT_SIZE_HEADER
+
+# ────────────────────────────────────────────────────────────────
+# SETTERS - Update global settings
+# ────────────────────────────────────────────────────────────────
+
+def set_global_figsize(width: int, height: int) -> None:
+    """
+    Set the global default figure size for all future plots.
+
+    Args:
+        width (int): Figure width in inches.
+        height (int): Figure height in inches.
+
+    Example:
+        >>> set_global_figsize(16, 10)  # All plots will now be 16x10 by default
+    """
+    global _GLOBAL_FIGSIZE
+    _GLOBAL_FIGSIZE = (width, height)
+
+def set_global_font_size_body(size: int) -> None:
+    """
+    Set the global default body font size for all future plots.
+
+    Args:
+        size (int): Font size in points for body text.
+
+    Example:
+        >>> set_global_font_size_body(14)  # All body text will be 14pt
+    """
+    global _GLOBAL_FONT_SIZE_BODY
+    _GLOBAL_FONT_SIZE_BODY = size
+
+def set_global_font_size_header(size: int) -> None:
+    """
+    Set the global default header font size for all future plots.
+
+    Args:
+        size (int): Font size in points for headers.
+
+    Example:
+        >>> set_global_font_size_header(18)  # All headers will be 18pt
+    """
+    global _GLOBAL_FONT_SIZE_HEADER
+    _GLOBAL_FONT_SIZE_HEADER = size
+
+def set_global_default_palette(palette_name: str) -> None:
+    """
+    Set the global default color palette for all future plots.
+
+    Args:
+        palette_name (str): Name of the palette to use as default.
+            Available: 'default', 'dark mode', 'alternative', 'greyscale',
+                      'steelseries_1', 'steelseries_darkmode', 'steelseries_alternative'
+
+    Example:
+        >>> set_global_default_palette('dark mode')  # All plots now dark mode
+        >>> set_global_default_palette('steelseries_1')  # Steelseries colors
+    """
+    global _GLOBAL_DEFAULT_PALETTE
+    # Validate palette exists
+    colors = get_color_palette(palette_name)  # Will error if invalid
+    _GLOBAL_DEFAULT_PALETTE = palette_name
+
+def get_global_default_palette() -> str:
+    """
+    Get the current global default color palette name.
+
+    Returns:
+        str: Current default palette name.
+
+    Example:
+        >>> get_global_default_palette()
+        'default'
+    """
+    return _GLOBAL_DEFAULT_PALETTE
+
+def set_global_plot_defaults(figsize: tuple[int, int] = None,
+                             font_size_body: int = None,
+                             font_size_header: int = None,
+                             default_palette: str = None) -> None:
+    """
+    Convenience function to set multiple global plot defaults at once.
+
+    Args:
+        figsize (tuple[int, int], optional): Figure size as (width, height).
+        font_size_body (int, optional): Body font size in points.
+        font_size_header (int, optional): Header font size in points.
+        default_palette (str, optional): Default color palette name.
+
+    Example:
+        >>> set_global_plot_defaults(figsize=(16, 10), font_size_body=14, font_size_header=18)
+        >>> # OR set just one parameter
+        >>> set_global_plot_defaults(font_size_body=16)
+        >>> # OR include palette
+        >>> set_global_plot_defaults(figsize=(12, 6), default_palette='dark mode')
+    """
+    if figsize is not None:
+        set_global_figsize(figsize[0], figsize[1])
+    if font_size_body is not None:
+        set_global_font_size_body(font_size_body)
+    if font_size_header is not None:
+        set_global_font_size_header(font_size_header)
+    if default_palette is not None:
+        set_global_default_palette(default_palette)
+
+def get_global_plot_defaults() -> dict:
+    """
+    Get all current global plot defaults as a dictionary.
+
+    Returns:
+        dict: Dictionary containing 'figsize', 'font_size_body', 'font_size_header', 'default_palette'.
+
+    Example:
+        >>> defaults = get_global_plot_defaults()
+        >>> print(defaults)
+        {'figsize': (12, 6), 'font_size_body': 12, 'font_size_header': 16, 'default_palette': 'default'}
+    """
+    return {
+        'figsize': _GLOBAL_FIGSIZE,
+        'font_size_body': _GLOBAL_FONT_SIZE_BODY,
+        'font_size_header': _GLOBAL_FONT_SIZE_HEADER,
+        'default_palette': _GLOBAL_DEFAULT_PALETTE
+    }
+
+# ────────────────────────────────────────────────────────────────
+# PRESET FUNCTIONS - Work with standard presets
+# ────────────────────────────────────────────────────────────────
+
+def list_available_presets() -> list[str]:
+    """
+    Get a list of all available preset names.
+
+    Returns:
+        list[str]: List of preset names that can be used with apply_preset().
+
+    Example:
+        >>> presets = list_available_presets()
+        >>> print(presets)
+        ['powerpoint_full', 'powerpoint_center', 'powerpoint_half', 'default', 'small', 'large', 'poster']
+    """
+    return list(STANDARD_FIGSIZES.keys())
+
+def get_preset_config(preset_name: str) -> dict:
+    """
+    Get the configuration for a specific preset without applying it.
+
+    Args:
+        preset_name (str): Name of the preset (e.g., 'powerpoint_full', 'default').
+
+    Returns:
+        dict: Dictionary with 'figsize', 'font_size_body', 'font_size_header'.
+
+    Raises:
+        ValueError: If preset_name is not found.
+
+    Example:
+        >>> config = get_preset_config('powerpoint_full')
+        >>> print(config)
+        {'figsize': (33.83, 19.05), 'font_size_body': 35, 'font_size_header': 45}
+    """
+    if preset_name not in STANDARD_FIGSIZES:
+        available = ', '.join(list_available_presets())
+        raise ValueError(f"Preset '{preset_name}' not found. Available presets: {available}")
+
+    return {
+        'figsize': STANDARD_FIGSIZES[preset_name],
+        'font_size_body': STANDARD_FONTS[preset_name]['body'],
+        'font_size_header': STANDARD_FONTS[preset_name]['header']
+    }
+
+def apply_preset(preset_name: str) -> None:
+    """
+    Apply a standard preset configuration to global defaults.
+
+    This is the main function to use when you want to quickly switch between
+    different output formats (e.g., PowerPoint, notebook, poster).
+
+    Args:
+        preset_name (str): Name of the preset to apply. Options include:
+            - 'powerpoint_full': Full PowerPoint slide (33.83x19.05, fonts: 45/35)
+            - 'powerpoint_center': Center content area (31.56x13.36, fonts: 40/30)
+            - 'powerpoint_half': Half slide (15.49x12.93, fonts: 32/24)
+            - 'default': Standard notebook (12x6, fonts: 16/12)
+            - 'small': Compact display (8x6, fonts: 14/10)
+            - 'large': Large display (16x10, fonts: 20/16)
+            - 'square': Square format (10x10, fonts: 16/12)
+            - 'wide': Wide format (16x6, fonts: 16/12)
+            - 'poster': Academic poster (24x36, fonts: 72/48)
+
+    Raises:
+        ValueError: If preset_name is not found.
+
+    Example:
+        >>> # Set up for PowerPoint export
+        >>> apply_preset('powerpoint_full')
+        >>> fig, ax = setup_plot()  # Will use PowerPoint dimensions and fonts
+
+        >>> # Switch back to notebook mode
+        >>> apply_preset('default')
+
+        >>> # See all available presets
+        >>> print(list_available_presets())
+    """
+    config = get_preset_config(preset_name)
+    set_global_plot_defaults(
+        figsize=config['figsize'],
+        font_size_body=config['font_size_body'],
+        font_size_header=config['font_size_header']
+    )
+    print(f"✅ Applied preset '{preset_name}':")
+    print(f"   Figsize: {config['figsize']}")
+    print(f"   Fonts: header={config['font_size_header']}, body={config['font_size_body']}")
+
+def print_all_presets() -> None:
+    """
+    Print a formatted table of all available presets with their configurations.
+
+    Example:
+        >>> print_all_presets()
+        Available Presets:
+        ==================
+        powerpoint_full     : (33.83, 19.05) | Header: 45pt | Body: 35pt
+        powerpoint_center   : (31.56, 13.36) | Header: 40pt | Body: 30pt
+        ...
+    """
+    print("\n📋 Available Presets:")
+    print("=" * 70)
+
+    for preset_name in sorted(STANDARD_FIGSIZES.keys()):
+        figsize = STANDARD_FIGSIZES[preset_name]
+        fonts = STANDARD_FONTS[preset_name]
+        print(f"{preset_name:20} : {figsize} | Header: {fonts['header']:2}pt | Body: {fonts['body']:2}pt")
+
+    print("\n💡 Usage: apply_preset('preset_name')")
+    print("=" * 70)
+
+# ────────────────────────────────────────────────────────────────
+# COLOR PALETTE FUNCTIONS
+# ────────────────────────────────────────────────────────────────
+
 def get_color_palette(palette_name: str = "default", /) -> dict[str, str]:
     """
     One-line description
@@ -173,7 +513,7 @@ def get_figsize(name = 'default'):
         raise ValueError(f"Unknown figure size '{name}'. Available sizes: {list(sizes.keys())}")
     return sizes.get(name, sizes['default'])
 
-def set_fontsizes(fig, ax, font_size_body=12, font_size_header=None):
+def set_fontsizes(fig, ax, font_size_body=None, font_size_header=None):
     """
     Uniformly set two different font sizes on an existing Matplotlib
     figure/axes pair.
@@ -182,18 +522,22 @@ def set_fontsizes(fig, ax, font_size_body=12, font_size_header=None):
     ----------
     fig : matplotlib.figure.Figure
     ax  : matplotlib.axes.Axes     (any axes object that lives in *fig*)
-    font_size_body   : int | float
+    font_size_body   : int | float, optional
         Size in points for tick labels, axis labels, annotation texts, etc.
+        If None, uses the global default set by set_global_font_size_body().
     font_size_header : int | float, optional
         Size in points for figure title, axes titles, legend titles.
-        If None, defaults to font_size_body + 4.
+        If None, uses the global default set by set_global_font_size_header().
 
     Returns
     -------
     (fig, ax) : the same objects for convenient chaining.
     """
+    # Use global defaults if not specified
+    if font_size_body is None:
+        font_size_body = _GLOBAL_FONT_SIZE_BODY
     if font_size_header is None:
-        font_size_header = font_size_body + 4
+        font_size_header = _GLOBAL_FONT_SIZE_HEADER
 
     # ------------------------------------------------------------------
     # 1)  Update the defaults so any *future* text will inherit new sizes
@@ -336,7 +680,7 @@ def _apply_style(fig, ax, colors: dict[str, str]) -> None:
     # -------- figure-wide font ----------------------------------
     plt.rcParams["font.family"] = font_properties.get_name()
 
-def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
+def setup_plot(*, color: str = None, figsize: tuple[int, int] = None):
     """
     One-line description
         Create a single (fig, ax) pair pre-styled with the company theme.
@@ -344,23 +688,34 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
     Summary
         * Loads the corporate font (once) from the `resources/fonts`
           directory. The font file is expected to be named
-          'CorporateSans.otf'.  
+          'CorporateSans.otf'.
         * Retrieves the requested colour palette via `get_color_palette`.
         * Applies background, grid, and text colours uniformly.
         * Returns the freshly created Figure and Axes objects.
 
     Args
     ----
-    color   : str
+    color   : str, optional
         Palette name.  Case-insensitive, minor typos allowed.
-    figsize : tuple[int, int]
+        If None, uses the global default palette set by set_global_default_palette().
+    figsize : tuple[int, int], optional
         Size in inches, forwarded to `plt.subplots`.
+        If None, uses the global default set by set_global_figsize().
 
     Returns
     -------
     fig, ax : matplotlib.figure.Figure, matplotlib.axes.Axes
         The newly created figure & axes ready for plotting.
     """
+    # ------------------------------------------------------------
+    # 1. Use global defaults if not specified
+    # ------------------------------------------------------------
+    if figsize is None:
+        figsize = _GLOBAL_FIGSIZE
+
+    if color is None:
+        color = _GLOBAL_DEFAULT_PALETTE
+
     # ------------------------------------------------------------
     # 2. Retrieve colour palette (handles user typos)
     # ------------------------------------------------------------
@@ -372,7 +727,511 @@ def setup_plot(*, color: str = "default", figsize: tuple[int, int] = (12, 6)):
     fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
     _apply_style(fig, ax, colors)
 
+    # ------------------------------------------------------------
+    # 4. Apply global font sizes
+    # ------------------------------------------------------------
+    set_fontsizes(fig, ax)
+
     return fig, ax
+
+def simple_setup_plot(figsize: tuple[int, int] = None):
+    """
+    Lightweight version of setup_plot - minimal styling, maximum simplicity.
+
+    Creates a matplotlib figure with basic styling using the default color palette.
+    Perfect for quick plots without the full corporate styling overhead.
+
+    Args:
+        figsize (tuple[int, int], optional): Figure size in inches.
+            If None, uses global default.
+
+    Returns:
+        tuple: (fig, ax, palette, shades)
+            - fig: matplotlib Figure
+            - ax: matplotlib Axes
+            - palette: Default color palette dict (easy access to colors)
+            - shades: Function to generate color shades
+
+    Example:
+        >>> fig, ax, palette, shades = simple_setup_plot()
+        >>> ax.plot(x, y, color=palette['Primary'])
+        >>> colors = shades(palette['Primary'], 5)
+        >>> ax.bar(x, y, color=colors[0])
+    """
+    # Use global figsize if not specified
+    figsize = figsize or _GLOBAL_FIGSIZE
+
+    # Get default palette
+    palette = _PALETTES['default']
+
+    # Create basic figure
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    # Apply minimal styling
+    fig.patch.set_facecolor(palette['Background'])
+    ax.set_facecolor(palette['Background'])
+    ax.spines['top'].set_color(palette['Secondary'])
+    ax.spines['bottom'].set_color(palette['Secondary'])
+    ax.spines['left'].set_color(palette['Secondary'])
+    ax.spines['right'].set_color(palette['Secondary'])
+    ax.tick_params(colors=palette['Secondary'])
+
+    return fig, ax, palette, generate_shades
+
+def add_logo(ax, logo: str = 'gn', position: str = 'lower right', zoom: float = 0.1, alpha: float = 1.0):
+    """
+    Add a logo/watermark to a matplotlib plot with automatic caching.
+
+    Downloads the logo once and caches it locally. Subsequent calls use the cached version.
+    Perfect for adding company logos or watermarks to all your plots.
+    **Defaults to GN logo** - just call add_logo(ax) with no parameters!
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes to add the logo to
+        logo (str): Logo name from LOGO_LIBRARY or direct URL
+            - Use name: 'gn', 'openai', 'microsoft', 'google', 'aws'
+            - Or direct URL: 'https://example.com/logo.png'
+            - Or local path: '/path/to/logo.png'
+            - Default: 'gn' (GN logo)
+        position (str): Position of logo. Options:
+            'lower right', 'lower left', 'upper right', 'upper left', 'center'
+        zoom (float): Size of logo (0.1 = 10% of original size)
+        alpha (float): Transparency (0.0 = invisible, 1.0 = opaque)
+
+    Returns:
+        matplotlib.axes.Axes: The axes with logo added
+
+    Example:
+        >>> # Use default GN logo
+        >>> fig, ax = plt.subplots()
+        >>> ax.plot(x, y)
+        >>> add_logo(ax)  # Uses GN logo by default!
+
+        >>> # Use logo from library
+        >>> add_logo(ax, 'microsoft', zoom=0.12)
+
+        >>> # Use custom URL
+        >>> add_logo(ax, 'https://your-logo.png', 'upper right')
+
+    Note:
+        - Default is 'gn' logo - just call add_logo(ax)
+        - Supports logo names from LOGO_LIBRARY
+        - First call downloads and caches the image
+        - Subsequent calls are instant (uses cache)
+        - Cache location: system temp directory
+        - Works with PNG (transparency), JPG, GIF
+        - Add more logos to LOGO_LIBRARY dictionary
+    """
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+    # Check if logo is a name in the library or a direct URL
+    if logo in LOGO_LIBRARY:
+        logo_url = LOGO_LIBRARY[logo]
+    else:
+        # Assume it's a direct URL or file path
+        logo_url = logo
+
+    # Cache directory
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_logos"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Generate cache filename from URL
+    logo_filename = logo_url.split('/')[-1].split('?')[0]
+    if not logo_filename:
+        logo_filename = "logo.png"
+    cache_path = cache_dir / logo_filename
+
+    # Download logo if not cached
+    if not cache_path.exists():
+        try:
+            print(f"📥 Downloading logo from {logo_url}...")
+            with urllib.request.urlopen(logo_url) as response:
+                if response.status != 200:
+                    raise FileNotFoundError(f"Failed to download logo. HTTP {response.status}")
+                with open(cache_path, 'wb') as f:
+                    f.write(response.read())
+            print(f"✅ Logo cached at {cache_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to download logo: {e}")
+            return ax
+
+    # Load logo image
+    try:
+        logo_img = plt.imread(str(cache_path))
+    except Exception as e:
+        print(f"⚠️  Failed to read logo image: {e}")
+        return ax
+
+    # Create image box
+    imagebox = OffsetImage(logo_img, zoom=zoom, alpha=alpha)
+
+    # Position mapping
+    positions = {
+        'lower right': (0.98, 0.02),
+        'lower left': (0.02, 0.02),
+        'upper right': (0.98, 0.98),
+        'upper left': (0.02, 0.98),
+        'center': (0.5, 0.5)
+    }
+
+    # Get position coordinates
+    if position in positions:
+        xy = positions[position]
+    else:
+        xy = positions['lower right']  # default
+
+    # Determine alignment
+    if 'right' in position:
+        box_alignment = (1, 0) if 'lower' in position else (1, 1)
+    elif 'left' in position:
+        box_alignment = (0, 0) if 'lower' in position else (0, 1)
+    else:  # center
+        box_alignment = (0.5, 0.5)
+
+    # Add logo to axes
+    ab = AnnotationBbox(
+        imagebox, xy,
+        xycoords='axes fraction',
+        frameon=False,
+        box_alignment=box_alignment
+    )
+    ax.add_artist(ab)
+
+    return ax
+
+def add_logos_to_legend(ax, company_logos: dict, logo_size: float = 0.05, **legend_kwargs):
+    """
+    Add company logos to legend entries for comparison charts.
+
+    Perfect for charts comparing OpenAI, Microsoft, AWS, Google, etc.
+    Each legend entry shows: [LOGO] Company Name ━━━ (line/marker)
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes with plotted data
+        company_logos (dict): Mapping of company names to logo identifiers
+            Keys: Company names (must match label in plot)
+            Values: Logo name from LOGO_LIBRARY or direct URL
+            Example: {'OpenAI': 'openai', 'Microsoft': 'microsoft'}
+        logo_size (float): Size of logos in legend (0.05 = small, 0.1 = medium)
+        **legend_kwargs: Additional arguments passed to ax.legend()
+
+    Returns:
+        matplotlib.legend.Legend: The legend with logos
+
+    Example:
+        >>> # Plot multiple companies
+        >>> fig, ax = plt.subplots()
+        >>> ax.plot(x, openai_data, label='OpenAI', linewidth=2)
+        >>> ax.plot(x, microsoft_data, label='Microsoft', linewidth=2)
+        >>> ax.plot(x, google_data, label='Google', linewidth=2)
+        >>>
+        >>> # Add logos to legend
+        >>> company_logos = {
+        >>>     'OpenAI': 'openai',
+        >>>     'Microsoft': 'microsoft',
+        >>>     'Google': 'google'
+        >>> }
+        >>> add_logos_to_legend(ax, company_logos)
+        >>> plt.show()
+
+    Note:
+        - Company names in dict must EXACTLY match plot labels
+        - Logos are automatically downloaded and cached
+        - Works with logo names or direct URLs
+        - Looks amazing for competitor comparisons!
+    """
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    from matplotlib.legend_handler import HandlerBase
+
+    # Custom legend handler that adds logos
+    class HandlerWithLogo(HandlerBase):
+        def __init__(self, logo_path, logo_size):
+            self.logo_path = logo_path
+            self.logo_size = logo_size
+            super().__init__()
+
+        def create_artists(self, legend, orig_handle, xdescent, ydescent,
+                          width, height, fontsize, trans):
+            # Get the logo image
+            try:
+                logo_img = plt.imread(self.logo_path)
+
+                # Create logo image box
+                imagebox = OffsetImage(logo_img, zoom=self.logo_size)
+
+                # Position logo at the start of the legend entry
+                ab = AnnotationBbox(imagebox, (xdescent + width/2, height/2),
+                                   xycoords=trans,
+                                   frameon=False,
+                                   box_alignment=(0.5, 0.5))
+
+                return [ab]
+            except:
+                # If logo fails, return empty
+                return []
+
+    # Download and cache all logos first
+    logo_paths = {}
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_logos"
+    cache_dir.mkdir(exist_ok=True)
+
+    for company, logo_id in company_logos.items():
+        # Get logo URL from library or use as-is
+        if logo_id in LOGO_LIBRARY:
+            logo_url = LOGO_LIBRARY[logo_id]
+        else:
+            logo_url = logo_id
+
+        # Generate cache filename
+        logo_filename = f"{company.lower().replace(' ', '_')}_logo.png"
+        cache_path = cache_dir / logo_filename
+
+        # Download if not cached
+        if not cache_path.exists():
+            try:
+                with urllib.request.urlopen(logo_url) as response:
+                    if response.status == 200:
+                        with open(cache_path, 'wb') as f:
+                            f.write(response.read())
+            except:
+                pass  # Skip if download fails
+
+        if cache_path.exists():
+            logo_paths[company] = str(cache_path)
+
+    # Get existing legend labels and handles
+    handles, labels = ax.get_legend_handles_labels()
+
+    # Create handler map for logos
+    handler_map = {}
+    for handle, label in zip(handles, labels):
+        if label in logo_paths:
+            handler_map[handle] = HandlerWithLogo(logo_paths[label], logo_size)
+
+    # Create legend with custom handlers
+    legend = ax.legend(handles=handles, labels=labels,
+                      handler_map=handler_map if handler_map else None,
+                      **legend_kwargs)
+
+    return legend
+
+
+def _download_and_cache_xkcd_font():
+    """
+    Download and cache the XKCD font, then register it with matplotlib.
+
+    This function downloads the official XKCD font from GitHub on first use,
+    caches it locally (like logos), and registers it with matplotlib's font manager.
+    Subsequent calls use the cached version.
+
+    Returns
+    -------
+    bool
+        True if font is available (cached or newly downloaded), False if download failed.
+
+    Notes
+    -----
+    - Font is cached in system temp directory (persists across sessions)
+    - Download happens only once, then cached forever
+    - Silently uses cached font if already downloaded
+    - Suppresses font warnings automatically
+    """
+    # Font URL (official XKCD font from ipython/xkcd-font repo)
+    font_url = "https://github.com/ipython/xkcd-font/raw/master/xkcd-script/font/xkcd-script.ttf"
+
+    # Cache directory (same pattern as logos)
+    cache_dir = Path(tempfile.gettempdir()) / "viz_utils_fonts"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Cache path
+    font_cache_path = cache_dir / "xkcd-script.ttf"
+
+    # Download font if not cached
+    if not font_cache_path.exists():
+        try:
+            # Silent download (no print statements for clean output)
+            with urllib.request.urlopen(font_url) as response:
+                if response.status != 200:
+                    return False  # Failed to download, continue without font
+                with open(font_cache_path, 'wb') as f:
+                    f.write(response.read())
+        except Exception:
+            # Silent failure - XKCD will use fallback fonts
+            return False
+
+    # Register font with matplotlib (if not already registered)
+    try:
+        # Check if font is already registered
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
+        if 'xkcd Script' not in available_fonts:
+            fm.fontManager.addfont(str(font_cache_path))
+            # Rebuild font cache
+            fm._load_fontmanager(try_read_cache=False)
+    except Exception:
+        # Silent failure - will use fallback fonts
+        return False
+
+    return True
+
+
+def xkcd(figsize=None, preset=None, persistent=False):
+    """
+    Create a matplotlib figure with XKCD comic-style rendering and conegliano styling.
+
+    This is the simplest way to create XKCD-style plots with your corporate colors and fonts.
+    Just call xkcd() and start plotting!
+
+    Parameters
+    ----------
+    figsize : tuple of float, optional
+        Figure dimensions (width, height) in inches. If None, uses global defaults.
+        Example: figsize=(10, 6)
+
+    preset : str, optional
+        Apply a standard preset configuration before creating the plot.
+        Available presets: 'powerpoint_full', 'powerpoint_center', 'powerpoint_half',
+                          'poster', 'paper', 'default', etc.
+        Example: preset='powerpoint_full'
+
+    persistent : bool, optional
+        If True, enables XKCD mode globally for all subsequent plots.
+        If False (default), only applies to the returned figure.
+        Example: persistent=True
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object with XKCD styling applied
+    ax : matplotlib.axes.Axes
+        The axes object ready for plotting
+
+    Examples
+    --------
+    Basic usage (super simple!):
+
+    >>> fig, ax = xkcd()
+    >>> ax.bar(['A', 'B', 'C'], [1, 2, 3])
+    >>> plt.show()
+
+    Persistent mode for multiple plots and custom functions:
+
+    >>> # Enable XKCD globally - styling persists!
+    >>> fig, ax = xkcd(persistent=True)
+    >>> create_some_custom_plot(ax, data, colors)  # Custom function uses XKCD!
+    >>> plt.show()
+    >>>
+    >>> # Next plot also uses XKCD
+    >>> fig2, ax2 = setup_plot()
+    >>> ax2.plot(x, y)
+    >>> plt.show()
+    >>>
+    >>> # Turn off when done
+    >>> plt.rcdefaults()
+
+    Alternative: Manual persistent control:
+
+    >>> plt.xkcd()  # Turn on globally
+    >>> fig, ax = setup_plot(figsize=(12, 6))
+    >>> create_some_plot(ax, df, colors)  # XKCD styling persists!
+    >>> plt.show()
+    >>> plt.rcdefaults()  # Turn off
+
+    With preset for PowerPoint:
+
+    >>> fig, ax = xkcd(preset='powerpoint_full')
+    >>> ax.plot(x, y)
+    >>> plt.show()
+
+    Custom figure size:
+
+    >>> fig, ax = xkcd(figsize=(10, 6))
+    >>> ax.scatter(x, y)
+    >>> plt.show()
+
+    Notes
+    -----
+    - Uses setup_plot() internally, so you get all the corporate styling
+    - Applies plt.xkcd() for hand-drawn comic look
+    - Colors from your default palette are preserved
+    - Works with all matplotlib plot types (plot, bar, scatter, etc.)
+    - **XKCD font automatically downloaded and cached** (like logos - first use only!)
+    - Font warnings are automatically suppressed
+    - If you need direct access to colors, use simple_setup_plot() instead
+    - For custom plotting functions, use persistent=True or manual plt.xkcd()
+
+    See Also
+    --------
+    setup_plot : Full-featured plot setup with all options
+    simple_setup_plot : Lightweight setup that returns palette and shades
+    apply_preset : Apply preset configurations
+    enable_xkcd_mode : Enable XKCD styling globally
+    disable_xkcd_mode : Disable XKCD styling
+    """
+    # Download and cache XKCD font (first time only, then cached forever like logos)
+    _download_and_cache_xkcd_font()
+
+    # Apply preset if requested
+    if preset is not None:
+        apply_preset(preset)
+
+    if persistent:
+        # Enable XKCD mode globally
+        plt.xkcd()
+        fig, ax = setup_plot(figsize=figsize)
+    else:
+        # Use XKCD context manager for this plot only
+        with plt.xkcd():
+            # Create figure with setup_plot to get corporate styling
+            fig, ax = setup_plot(figsize=figsize)
+
+    return fig, ax
+
+
+def enable_xkcd_mode():
+    """
+    Enable XKCD comic-style rendering globally for all subsequent plots.
+
+    Call this once at the beginning of your notebook to apply XKCD styling to all plots.
+    Use disable_xkcd_mode() or plt.rcdefaults() to turn it off.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>>
+    >>> fig, ax = setup_plot()
+    >>> ax.plot(x, y)
+    >>>
+    >>> create_some_custom_plot(ax, df, colors)  # XKCD styling persists!
+    >>>
+    >>> disable_xkcd_mode()  # Turn off when done
+
+    See Also
+    --------
+    disable_xkcd_mode : Turn off XKCD styling
+    xkcd : Create single plot with XKCD styling
+    """
+    # Download and cache XKCD font if needed
+    _download_and_cache_xkcd_font()
+
+    plt.xkcd()
+
+
+def disable_xkcd_mode():
+    """
+    Disable XKCD comic-style rendering and return to normal matplotlib styling.
+
+    Examples
+    --------
+    >>> enable_xkcd_mode()
+    >>> # ... make XKCD plots ...
+    >>> disable_xkcd_mode()  # Back to normal
+
+    See Also
+    --------
+    enable_xkcd_mode : Turn on XKCD styling
+    """
+    plt.rcdefaults()
+
 
 def get_current_path():
     # oh it would be nice to get path for the folder i'm working in 
@@ -573,7 +1432,68 @@ def smart_text_labels(ax,
 
 ###
 ### Colors
-### 
+###
+
+def generate_shades(hex_color: str, num_shades: int = 5) -> list[str]:
+    """
+    Generates a list of darker shades for a given hex color.
+
+    This function converts a hex color string into the HSL (Hue, Lightness, Saturation)
+    color space. It then creates a series of new colors by decreasing the "Lightness"
+    value, effectively producing darker shades of the original color. These new HSL
+    colors are then converted back to hex format.
+
+    Args:
+        hex_color (str): The base color in hex format (e.g., '#3498db' or '3498db').
+        num_shades (int): The number of darker shades to generate. Defaults to 5.
+
+    Returns:
+        list[str]: A list of hex color strings representing the shades, from darkest to lightest (the original color).
+    """
+    # Line 1: Remove the '#' prefix from the hex string if it exists.
+    # The lstrip('#') method removes any leading '#' characters.
+    clean_hex = hex_color.lstrip('#')
+
+    # Line 2: Convert the 6-character hex string into three separate integer values for Red, Green, and Blue.
+    # We parse the string in chunks of 2 characters (e.g., '34', '98', 'db') and convert each
+    # hexadecimal chunk to its corresponding integer value (0-255).
+    rgb = tuple(int(clean_hex[i:i+2], 16) for i in (0, 2, 4))
+
+    # Line 3: Convert the RGB tuple (e.g., (52, 152, 219)) to the HLS (Hue, Lightness, Saturation) color space.
+    # The colorsys library requires RGB values to be normalized to a 0-1 scale, so we divide each by 255.
+    # Mathematics: HLS is a cylindrical representation of colors. 'Lightness' is the central axis,
+    # from black (0) to white (1). By changing only Lightness, we create shades and tints without altering the base color (Hue).
+    h, l, s = colorsys.rgb_to_hls(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+
+    # Line 4: Generate a list to store the resulting hex codes for the shades.
+    shades_hex = []
+
+    # Line 5: Create an array of evenly spaced "Lightness" values.
+    # We use numpy's linspace to create `num_shades` values starting from a dark value (l * 0.2) up to the original lightness (l).
+    # This creates the steps for our gradient of shades.
+    lightness_steps = np.linspace(l * 0.2, l, num_shades)
+
+    # Line 6: Loop through each of the new lightness values to create the corresponding shade.
+    for step in lightness_steps:
+        # Line 7: Convert the HLS color (with the new, modified lightness) back to an RGB tuple.
+        # The hue (h) and saturation (s) remain constant to preserve the original color's character.
+        new_rgb_normalized = colorsys.hls_to_rgb(h, step, s)
+
+        # Line 8: Convert the normalized RGB values (0-1) back to the standard 0-255 scale.
+        # We multiply by 255 and round to the nearest integer.
+        new_rgb = tuple(int(c * 255) for c in new_rgb_normalized)
+
+        # Line 9: Format the RGB tuple back into a hex string.
+        # The format specifier '{:02x}' ensures each R, G, B value is a two-digit lowercase hex number (e.g., 10 becomes '0a').
+        # We then join them and prepend with a '#' to form the final hex code.
+        hex_code = f"#{new_rgb[0]:02x}{new_rgb[1]:02x}{new_rgb[2]:02x}"
+
+        # Line 10: Add the newly generated hex code to our list of shades.
+        shades_hex.append(hex_code)
+
+    # Line 11: Return the complete list of shades.
+    return shades_hex
+
 
 def highlight_values(dataframe, column, command, amount):        
     """
@@ -790,6 +1710,74 @@ def create_stacked_bar(ax, working_dataframe, color, x_column = 'top_manager', y
     return ax
 
 
+def create_stacked_bar_chart(ax, working_dataframe: pd.DataFrame, primary_color: str = '#00447E', horizontal: bool = True, bar_width: float = 0.8):
+    """
+    Creates a versatile horizontal or vertical stacked bar chart from a DataFrame.
+
+    This function automatically uses the first column for categories and all other
+    numerical columns for stacked segments. It sorts the categories to ensure a logical
+    order (e.g., chronological). It supports both horizontal and vertical orientations.
+
+    Args:
+        ax (matplotlib.axes.Axes): The axes object to draw the chart on.
+        working_dataframe (pd.DataFrame): DataFrame where the first column is the category
+                                          and subsequent columns are numerical values.
+        primary_color (str, optional): Base hex color for the palette. Defaults to '#00447E'.
+        horizontal (bool, optional): If True, creates a horizontal bar chart.
+                                     If False, creates a vertical bar chart. Defaults to True.
+        bar_width (float, optional): The width (or height for horizontal) of the bars.
+                                     Defaults to 0.8.
+
+    Returns:
+        matplotlib.axes.Axes: The modified axes object with the chart.
+    """
+    # Line 1: Identify the category column (first column) and value columns (the rest).
+    category_column = working_dataframe.columns[0]
+    value_columns = working_dataframe.columns[1:]
+
+    # Line 2: Sort the DataFrame by the category column to ensure a consistent, logical order.
+    # For dates or numbers, this creates a chronological or numerical axis.
+    df_sorted = working_dataframe.sort_values(by=category_column, ascending=True)
+
+    # Line 3: Verify that there are value columns to plot.
+    if len(value_columns) == 0:
+        raise ValueError("DataFrame must have at least two columns: one for categories and one for values.")
+
+    # Line 4: Generate a color palette from the primary color.
+    colors = generate_shades(primary_color, num_shades=len(value_columns))
+    color_map = {col: color for col, color in zip(value_columns, colors)}
+
+    # Line 5: Get the sorted category labels for the axis.
+    categories = df_sorted[category_column]
+
+    # Line 6: Check the orientation and plot accordingly.
+    if horizontal:
+        # Line 7: For horizontal bars, initialize a `left` offset array to stack segments from left to right.
+        left = np.zeros(len(df_sorted))
+        # Line 8: Loop through each value column to plot its segment.
+        for column in value_columns:
+            values = df_sorted[column]
+            # Line 9: Plot the horizontal bar segment. `left` determines its starting position.
+            ax.barh(categories, values, left=left, color=color_map[column], height=bar_width, label=column)
+            # Line 10: Update the `left` offset for the next segment.
+            left += values.values
+        # Line 11: Invert the y-axis so that categories (like dates) are ascending from bottom to top.
+        ax.invert_yaxis()
+    else:
+        # Line 12: For vertical bars, initialize a `bottom` offset array to stack segments upwards.
+        bottom = np.zeros(len(df_sorted))
+        # Line 13: Loop through each value column to plot its segment.
+        for column in value_columns:
+            values = df_sorted[column]
+            # Line 14: Plot the vertical bar segment. `bottom` determines its starting position.
+            ax.bar(categories, values, bottom=bottom, color=color_map[column], width=bar_width, label=column)
+            # Line 15: Update the `bottom` offset for the next segment.
+            bottom += values.values
+
+    # Line 16: Return the modified axes object.
+    return ax
+
+
 ###
 ###
 ###
@@ -801,7 +1789,7 @@ def setup_subplots(
     color: str = "default",
     sharex=False,
     sharey=False,
-    figsize=(10, 6),
+    figsize=None,
     **kwargs,):
     """
     Create a grid of subplots that already follow the corporate style.
@@ -811,14 +1799,18 @@ def setup_subplots(
     nrows, ncols : int    – handed to `plt.subplots`
     color        : str    – palette name passed to `get_color_palette`
     sharex/sharey: bool   – forwarded to `plt.subplots`
-    figsize      : tuple  – inches, forwarded to `plt.subplots`
+    figsize      : tuple, optional  – inches, forwarded to `plt.subplots`
+                   If None, uses the global default set by set_global_figsize().
     **kwargs             – any other kwarg accepted by `plt.subplots`
 
     Returns
     -------
     fig, axs     – same objects as `plt.subplots` would return
     """
-    
+    # Use global figsize if not specified
+    if figsize is None:
+        figsize = _GLOBAL_FIGSIZE
+
     colors = get_color_palette(palette_name=color)
 
     fig, axs = plt.subplots(
@@ -832,6 +1824,15 @@ def setup_subplots(
     )
 
     _apply_style(fig, axs, colors)
+
+    # Apply global font sizes to all axes
+    # axs might be a single Axes or an array of Axes
+    if isinstance(axs, np.ndarray):
+        for ax in axs.flat:
+            set_fontsizes(fig, ax)
+    else:
+        set_fontsizes(fig, axs)
+
     return fig, axs
 
 def _tag_figure(fig, font_properties, colors):

@@ -42,43 +42,84 @@ def get_columns(path: str) -> str:
         return f"Error reading file: {str(e)}"
 
 
+def humanise_text(text: str) -> str:
+    """
+    Transforms a string into human-readable format using the same rules as humanise_df.
+
+    Applies the following transformations:
+    1. Replaces underscores with spaces
+    2. Replaces hyphens with spaces
+    3. Applies title case to the first word
+    4. Applies lowercase to remaining words
+
+    This function uses the exact same logic as humanise_df() but works on individual strings
+    instead of DataFrame columns.
+
+    Args:
+        text (str): Input string to humanize
+
+    Returns:
+        str: Humanized text with proper formatting
+
+    Examples:
+        >>> humanise_text("customer_id")
+        'Customer id'
+
+        >>> humanise_text("total_revenue_USD")
+        'Total revenue usd'
+
+        >>> humanise_text("purchase-date")
+        'Purchase date'
+
+        >>> humanise_text("FULL_NAME")
+        'Full name'
+    """
+    # Replace underscores and hyphens with spaces
+    new_text = text.replace('_', ' ').replace('-', ' ')
+
+    # Split into words and apply title case to first word, lowercase to rest
+    words = new_text.split(' ')
+    formatted_words = []
+
+    for i, word in enumerate(words):
+        if i == 0:
+            formatted_words.append(word.title())  # First word title case
+        else:
+            formatted_words.append(word.lower())  # Other words lowercase
+
+    # Join words back together
+    return ' '.join(formatted_words)
+
+
 def humanise_df(local_df: pd.DataFrame) -> pd.DataFrame:
     """
     Takes a DataFrame and returns it with humanized column names.
-    
+
+    Uses humanise_text() to transform each column name:
     1. Creates copy of input DataFrame
     2. Replaces underscores and hyphens with spaces
     3. Applies title case to first word, lowercase to others
     4. Returns DataFrame with formatted column names
-    
+
     Args:
         local_df (pd.DataFrame): Input DataFrame to humanize
-        
-    Returns type: df_copy (pd.DataFrame) - DataFrame with humanized column names
+
+    Returns:
+        pd.DataFrame: DataFrame with humanized column names
+
+    Examples:
+        >>> df = pd.DataFrame({'customer_id': [1, 2], 'total_revenue_USD': [100, 200]})
+        >>> humanised = humanise_df(df)
+        >>> humanised.columns.tolist()
+        ['Customer id', 'Total revenue usd']
     """
     # Create a copy to avoid modifying the original
     df_copy = local_df.copy()
-    
-    for col in df_copy.columns.tolist():
-        # Replace underscores and hyphens with spaces
-        new_col = col.replace('_', ' ').replace('-', ' ')
-        
-        # Split into words and apply title case to first word, lowercase to rest
-        words = new_col.split(' ')
-        formatted_words = []
-        
-        for i, word in enumerate(words):
-            if i == 0:
-                formatted_words.append(word.title())  # First word title case
-            else:
-                formatted_words.append(word.lower())  # Other words lowercase
-        
-        # Join words back together
-        new_col = ' '.join(formatted_words)
-        
-        # Rename the column
-        df_copy.rename(columns={col: new_col}, inplace=True)
-    
+
+    # Apply humanise_text to each column name
+    column_mapping = {col: humanise_text(col) for col in df_copy.columns}
+    df_copy.rename(columns=column_mapping, inplace=True)
+
     return df_copy
 
 
