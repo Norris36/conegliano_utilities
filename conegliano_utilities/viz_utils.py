@@ -164,8 +164,8 @@ _GLOBAL_DEFAULT_PALETTE: str = 'default'  # Default color palette name
 # Add your own logos to this dictionary as you collect them
 
 LOGO_LIBRARY = {
-    # Default GN logo (replace with actual GN logo URL when available)
-    'gn': 'https://via.placeholder.com/150x50/F57600/FFFFFF?text=GN',  # Placeholder - replace with real GN logo
+    # GN Store Nord official logo
+    'gn': 'https://www.pinpng.com/pngs/m/144-1445658_gn-store-nord-logo-hd-png-download.png',
 
     # Tech companies (example URLs - replace with actual logos)
     'openai': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/200px-OpenAI_Logo.svg.png',
@@ -252,23 +252,63 @@ def set_global_font_size_header(size: int) -> None:
     global _GLOBAL_FONT_SIZE_HEADER
     _GLOBAL_FONT_SIZE_HEADER = size
 
-def set_global_default_palette(palette_name: str) -> None:
+def set_global_default_palette(palette: str | dict[str, str], name: str = None) -> None:
     """
     Set the global default color palette for all future plots.
 
     Args:
-        palette_name (str): Name of the palette to use as default.
-            Available: 'default', 'dark mode', 'alternative', 'greyscale',
-                      'steelseries_1', 'steelseries_darkmode', 'steelseries_alternative'
+        palette (str | dict): Either:
+            - str: Name of existing palette ('default', 'dark mode', 'alternative', etc.)
+            - dict: Custom palette with required keys (Primary, Secondary, TertiaryA, Background, Accent, Grid)
+        name (str, optional): Name for custom palette (only used when palette is dict).
+            If not provided, generates name 'custom_palette_N'
 
-    Example:
-        >>> set_global_default_palette('dark mode')  # All plots now dark mode
-        >>> set_global_default_palette('steelseries_1')  # Steelseries colors
+    Raises:
+        ValueError: If palette dict is missing required keys or has invalid HEX values
+
+    Examples:
+        >>> # Using existing palette
+        >>> set_global_default_palette('dark mode')
+
+        >>> # Using custom palette dict
+        >>> my_colors = {
+        ...     'Primary': '#FF5733',
+        ...     'Secondary': '#33FF57',
+        ...     'TertiaryA': '#3357FF',
+        ...     'Background': '#FFFFFF',
+        ...     'Accent': '#FFD700',
+        ...     'Grid': '#CCCCCC'
+        ... }
+        >>> set_global_default_palette(my_colors, name='my_brand')
     """
     global _GLOBAL_DEFAULT_PALETTE
-    # Validate palette exists
-    colors = get_color_palette(palette_name)  # Will error if invalid
-    _GLOBAL_DEFAULT_PALETTE = palette_name
+
+    # Case 1: palette is a string (existing palette name)
+    if isinstance(palette, str):
+        # Validate palette exists
+        colors = get_color_palette(palette)  # Will error if invalid
+        _GLOBAL_DEFAULT_PALETTE = palette
+
+    # Case 2: palette is a dict (custom palette)
+    elif isinstance(palette, dict):
+        # Generate name if not provided
+        if name is None:
+            # Find next available custom_palette_N name
+            counter = 1
+            while f"custom_palette_{counter}" in _PALETTES:
+                counter += 1
+            name = f"custom_palette_{counter}"
+
+        # Register the custom palette (this validates it)
+        register_color_palette(name, palette)
+
+        # Set as default
+        _GLOBAL_DEFAULT_PALETTE = name.strip().lower().replace("_", " ")
+
+    else:
+        raise TypeError(
+            f"palette must be str or dict, got {type(palette).__name__}"
+        )
 
 def get_global_default_palette() -> str:
     """
@@ -283,10 +323,87 @@ def get_global_default_palette() -> str:
     """
     return _GLOBAL_DEFAULT_PALETTE
 
+def register_color_palette(name: str, palette: dict[str, str]) -> None:
+    """
+    Register a custom color palette for use throughout the viz module.
+
+    Args:
+        name (str): Unique name for the palette
+        palette (dict[str, str]): Dictionary with required keys:
+            - 'Primary': Main color (HEX format)
+            - 'Secondary': Secondary color (HEX format)
+            - 'TertiaryA': Tertiary color (HEX format)
+            - 'Background': Background color (HEX format)
+            - 'Accent': Accent color (HEX format)
+            - 'Grid': Grid line color (HEX format)
+
+    Raises:
+        ValueError: If palette is missing required keys or has invalid HEX values
+
+    Example:
+        >>> my_palette = {
+        ...     'Primary': '#FF5733',
+        ...     'Secondary': '#33FF57',
+        ...     'TertiaryA': '#3357FF',
+        ...     'Background': '#FFFFFF',
+        ...     'Accent': '#FFD700',
+        ...     'Grid': '#CCCCCC'
+        ... }
+        >>> register_color_palette('my_custom', my_palette)
+        >>> set_global_default_palette('my_custom')
+    """
+    # Required keys for a valid palette
+    required_keys = {'Primary', 'Secondary', 'TertiaryA', 'Background', 'Accent', 'Grid'}
+
+    # Check if all required keys are present
+    provided_keys = set(palette.keys())
+    missing_keys = required_keys - provided_keys
+
+    if missing_keys:
+        raise ValueError(
+            f"Palette is missing required keys: {missing_keys}\n"
+            f"Required keys: {required_keys}"
+        )
+
+    # Validate HEX format for each color
+    import re
+    hex_pattern = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+    invalid_colors = {}
+    for key, value in palette.items():
+        if key in required_keys:  # Only validate required keys
+            if not isinstance(value, str) or not hex_pattern.match(value):
+                invalid_colors[key] = value
+
+    if invalid_colors:
+        raise ValueError(
+            f"Invalid HEX color values: {invalid_colors}\n"
+            f"All colors must be in HEX format (e.g., '#FF5733')"
+        )
+
+    # Register the palette (normalize name to lowercase with spaces)
+    normalized_name = name.strip().lower().replace("_", " ")
+    _PALETTES[normalized_name] = {k: palette[k] for k in required_keys}
+
+    print(f"✓ Registered custom palette: '{normalized_name}'")
+
+def get_all_palettes() -> list[str]:
+    """
+    Get a list of all available color palette names.
+
+    Returns:
+        list[str]: List of all registered palette names
+
+    Example:
+        >>> get_all_palettes()
+        ['default', 'dark mode', 'alternative', 'greyscale', ...]
+    """
+    return sorted(_PALETTES.keys())
+
 def set_global_plot_defaults(figsize: tuple[int, int] = None,
                              font_size_body: int = None,
                              font_size_header: int = None,
-                             default_palette: str = None) -> None:
+                             default_palette: str | dict[str, str] = None) -> None:
     """
     Convenience function to set multiple global plot defaults at once.
 
@@ -294,14 +411,19 @@ def set_global_plot_defaults(figsize: tuple[int, int] = None,
         figsize (tuple[int, int], optional): Figure size as (width, height).
         font_size_body (int, optional): Body font size in points.
         font_size_header (int, optional): Header font size in points.
-        default_palette (str, optional): Default color palette name.
+        default_palette (str | dict, optional): Either:
+            - str: Name of existing palette
+            - dict: Custom palette with required keys
 
-    Example:
+    Examples:
         >>> set_global_plot_defaults(figsize=(16, 10), font_size_body=14, font_size_header=18)
         >>> # OR set just one parameter
         >>> set_global_plot_defaults(font_size_body=16)
-        >>> # OR include palette
+        >>> # OR include palette by name
         >>> set_global_plot_defaults(figsize=(12, 6), default_palette='dark mode')
+        >>> # OR include custom palette dict
+        >>> my_colors = {'Primary': '#FF5733', 'Secondary': '#33FF57', ...}
+        >>> set_global_plot_defaults(default_palette=my_colors)
     """
     if figsize is not None:
         set_global_figsize(figsize[0], figsize[1])

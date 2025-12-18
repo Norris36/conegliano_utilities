@@ -10,7 +10,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="conegliano-utilities",
-    version="1.1.32",
+    version="1.1.36",
     author="Jens Bay",
     description="Personal utility functions for data science and development tasks",
     long_description=long_description,

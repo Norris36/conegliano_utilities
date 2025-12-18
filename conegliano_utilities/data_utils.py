@@ -123,6 +123,140 @@ def humanise_df(local_df: pd.DataFrame) -> pd.DataFrame:
     return df_copy
 
 
+def quick_overview(df: pd.DataFrame, n_rows: int = 5) -> pd.DataFrame:
+    """
+    Get a comprehensive overview of a DataFrame quickly.
+
+    Returns a single DataFrame with sample rows at the top and statistics rows below.
+    Perfect for initial data exploration - combines .head(), .info(), and .describe().
+
+    Args:
+        df (pd.DataFrame): DataFrame to analyze
+        n_rows (int, optional): Number of sample rows to return. Defaults to 5.
+
+    Returns:
+        pd.DataFrame: Single DataFrame containing:
+            - First n rows: Sample data from the DataFrame
+            - Then statistics rows:
+                * dtype: Data type
+                * non_null: Count of non-null values
+                * null_count: Count of null values
+                * null_pct: Percentage of null values
+                * unique: Number of unique values
+                * top_value: Most common value (for object/category types)
+                * top_freq: Frequency of most common value
+                * mean: Mean (for numeric types)
+                * std: Standard deviation (for numeric types)
+                * min: Minimum value (for numeric types)
+                * 25%: 25th percentile (for numeric types)
+                * 50%: Median (for numeric types)
+                * 75%: 75th percentile (for numeric types)
+                * max: Maximum value (for numeric types)
+
+    Examples:
+        >>> df = pd.DataFrame({
+        ...     'customer_id': [1, 2, 3, None, 5],
+        ...     'revenue': [100, 200, None, 400, 500],
+        ...     'category': ['A', 'B', 'A', 'B', 'A']
+        ... })
+        >>> overview = quick_overview(df, n_rows=3)
+        >>> display(overview)  # Shows first 3 rows + stats rows below
+    """
+    import numpy as np
+
+    # Start with sample rows
+    result = df.head(n_rows).copy()
+
+    # Build statistics rows
+    stats_rows = {}
+
+    # dtype row
+    stats_rows['dtype'] = {col: str(df[col].dtype) for col in df.columns}
+
+    # non_null row
+    stats_rows['non_null'] = {col: df[col].notna().sum() for col in df.columns}
+
+    # null_count row
+    stats_rows['null_count'] = {col: df[col].isna().sum() for col in df.columns}
+
+    # null_pct row
+    stats_rows['null_pct'] = {col: f"{round(df[col].isna().sum() / len(df) * 100, 2)}%" for col in df.columns}
+
+    # unique row
+    stats_rows['unique'] = {col: df[col].nunique() for col in df.columns}
+
+    # top_value row (for text columns)
+    top_values = {}
+    for col in df.columns:
+        if df[col].dtype in ['object', 'category'] or str(df[col].dtype).startswith('string'):
+            try:
+                value_counts = df[col].value_counts()
+                top_values[col] = value_counts.index[0] if len(value_counts) > 0 else '-'
+            except:
+                top_values[col] = '-'
+        else:
+            top_values[col] = '-'
+    stats_rows['top_value'] = top_values
+
+    # top_freq row (for text columns)
+    top_freqs = {}
+    for col in df.columns:
+        if df[col].dtype in ['object', 'category'] or str(df[col].dtype).startswith('string'):
+            try:
+                value_counts = df[col].value_counts()
+                top_freqs[col] = value_counts.iloc[0] if len(value_counts) > 0 else '-'
+            except:
+                top_freqs[col] = '-'
+        else:
+            top_freqs[col] = '-'
+    stats_rows['top_freq'] = top_freqs
+
+    # Numeric statistics (mean, std, min, percentiles, max)
+    stats_rows['mean'] = {}
+    stats_rows['std'] = {}
+    stats_rows['min'] = {}
+    stats_rows['25%'] = {}
+    stats_rows['50%'] = {}
+    stats_rows['75%'] = {}
+    stats_rows['max'] = {}
+
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            try:
+                stats_rows['mean'][col] = round(df[col].mean(), 2) if df[col].notna().sum() > 0 else '-'
+                stats_rows['std'][col] = round(df[col].std(), 2) if df[col].notna().sum() > 0 else '-'
+                stats_rows['min'][col] = df[col].min() if df[col].notna().sum() > 0 else '-'
+                stats_rows['25%'][col] = round(df[col].quantile(0.25), 2) if df[col].notna().sum() > 0 else '-'
+                stats_rows['50%'][col] = round(df[col].median(), 2) if df[col].notna().sum() > 0 else '-'
+                stats_rows['75%'][col] = round(df[col].quantile(0.75), 2) if df[col].notna().sum() > 0 else '-'
+                stats_rows['max'][col] = df[col].max() if df[col].notna().sum() > 0 else '-'
+            except:
+                stats_rows['mean'][col] = '-'
+                stats_rows['std'][col] = '-'
+                stats_rows['min'][col] = '-'
+                stats_rows['25%'][col] = '-'
+                stats_rows['50%'][col] = '-'
+                stats_rows['75%'][col] = '-'
+                stats_rows['max'][col] = '-'
+        else:
+            stats_rows['mean'][col] = '-'
+            stats_rows['std'][col] = '-'
+            stats_rows['min'][col] = '-'
+            stats_rows['25%'][col] = '-'
+            stats_rows['50%'][col] = '-'
+            stats_rows['75%'][col] = '-'
+            stats_rows['max'][col] = '-'
+
+    # Convert stats rows to DataFrame and append
+    stats_df = pd.DataFrame(stats_rows).T
+    stats_df.columns = df.columns
+
+    # Concatenate sample rows and stats rows
+    result = pd.concat([result, stats_df], axis=0)
+
+    return result
+
+
 def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Renames DataFrame columns to a standardized format.
