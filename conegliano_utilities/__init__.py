@@ -6,7 +6,7 @@ import warnings
 import requests
 from packaging import version
 
-__version__ = "1.1.19"
+__version__ = "1.1.33"
 
 
 def check_for_updates():
@@ -66,6 +66,16 @@ from .email_issue_reporter import *
 from .global_issue_logger import *
 from .code_extractor import *
 from .issue_solver import *
+from .payperwash import (
+    PayPerWash,
+    PayPerWashError,
+    LoginError,
+    BookingError,
+    TimeSlot,
+    test_payperwash_connection,
+    parse_calendar_html,
+    get_available_slots_from_html,
+)
 
 # Print version info on import
 print_version_info()
@@ -140,4 +150,13 @@ __all__ = [
     "solve",       # Alias
     "quick_solution",  # Alias
     "list_issues", # Alias
+    # PayPerWash automation
+    "PayPerWash",
+    "PayPerWashError",
+    "LoginError",
+    "BookingError",
+    "TimeSlot",
+    "test_payperwash_connection",
+    "parse_calendar_html",
+    "get_available_slots_from_html",
 ]
